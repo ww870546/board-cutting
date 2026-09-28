@@ -1,0 +1,5223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>板材切割排版优化系统</title>
+<style>
+/* ========== 全局重置与变量 ========== */
+:root {
+  --bg-primary: #f0f2f5;
+  --bg-card: #ffffff;
+  --bg-dark: #1e2a3a;
+  --bg-darker: #151d29;
+  --border: #d9dee5;
+  --border-light: #e8ecf0;
+  --text-primary: #1a2332;
+  --text-secondary: #5a6a7e;
+  --text-muted: #8a97a8;
+  --accent: #e87722;
+  --accent-light: #f5a623;
+  --accent-bg: #fef3e8;
+  --blue: #2c6fbb;
+  --blue-light: #e8f0fa;
+  --green: #2e9e5b;
+  --green-light: #e6f5ec;
+  --red: #d64545;
+  --red-light: #fbeaea;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.1);
+  --radius: 6px;
+  --radius-sm: 4px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  min-width: 1100px;
+}
+
+/* ========== 顶部栏 ========== */
+.header {
+  background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darker) 100%);
+  color: #fff;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 3px solid var(--accent);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo {
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.header-subtitle {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  margin-left: 4px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: #d46a1c; }
+
+.btn-outline {
+  border-color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.85);
+}
+.btn-outline:hover { border-color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.08); }
+
+.btn-ghost {
+  color: var(--text-secondary);
+  border-color: var(--border);
+  background: var(--bg-card);
+}
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-danger {
+  color: var(--red);
+  border-color: transparent;
+  background: transparent;
+  padding: 4px 8px;
+}
+.btn-danger:hover { background: var(--red-light); }
+
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ========== 主布局 ========== */
+.main {
+  display: flex;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+}
+
+/* ========== 左侧面板 ========== */
+.sidebar {
+  width: 380px;
+  min-width: 380px;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-section {
+  border-bottom: 1px solid var(--border-light);
+}
+
+.panel-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f7f9fb;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-title .icon {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.panel-body {
+  padding: 14px 16px;
+}
+
+/* 表单元素 */
+.form-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.form-row:last-child { margin-bottom: 0; }
+
+.form-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.form-input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: #fff;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(232,119,34,0.15);
+}
+
+.form-input::placeholder { color: var(--text-muted); }
+
+select.form-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a97a8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+/* ========== 全局 select 对比度强制修复（解决手机端白字白底问题） ========== */
+select {
+  color: #1a2332 !important;
+  background-color: #fff !important;
+}
+select option {
+  color: #1a2332;
+  background: #fff;
+}
+select.form-input {
+  color: #1a2332 !important;
+  background-color: #fff !important;
+}
+.algorithm-settings select {
+  color: #1a2332 !important;
+  background-color: #fff !important;
+}
+
+/* 零件列表 */
+.parts-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.part-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+
+.part-item:hover { border-color: var(--accent); }
+
+.part-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.part-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.part-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+
+.part-name-input {
+  width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: #fff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(232,119,34,0.15);
+}
+
+.part-dims {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.part-qty {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--blue-light);
+  padding: 2px 10px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  cursor: pointer;
+  min-width: 32px;
+  text-align: center;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.part-qty:hover {
+  background: var(--blue);
+  color: #fff;
+}
+
+.part-qty-input {
+  width: 52px;
+  padding: 3px 4px;
+  border: 1px solid var(--blue);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: #fff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(44,111,187,0.15);
+  flex-shrink: 0;
+}
+
+/* 隐藏 number input 的上下箭头 */
+.part-qty-input::-webkit-outer-spin-button,
+.part-qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.part-qty-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.part-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+
+.icon-btn:hover { background: var(--bg-primary); color: var(--text-primary); }
+.icon-btn.danger:hover { background: var(--red-light); color: var(--red); }
+
+/* 添加零件表单 */
+.add-part-form {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-light);
+  background: #fafbfc;
+}
+
+.add-part-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.add-part-grid .form-group.full { grid-column: 1 / -1; }
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-muted);
+}
+
+.empty-state-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.4;
+}
+
+.empty-state-text {
+  font-size: 13px;
+}
+
+/* ========== 右侧内容区 ========== */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 统计栏 */
+.stats-bar {
+  display: flex;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.stat-card {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: #f7f9fb;
+  border-left: 3px solid var(--border);
+}
+
+.stat-card.used { border-left-color: var(--green); }
+.stat-card.waste { border-left-color: var(--red); }
+.stat-card.sheets { border-left-color: var(--blue); }
+.stat-card.efficiency { border-left-color: var(--accent); }
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value .unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.stat-value.green { color: var(--green); }
+.stat-value.red { color: var(--red); }
+.stat-value.orange { color: var(--accent); }
+
+/* 板材标签页 */
+.sheets-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 20px 0;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.sheet-tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  background: transparent;
+  font-family: inherit;
+}
+
+.sheet-tab:hover { color: var(--text-primary); background: var(--bg-primary); }
+
+.sheet-tab.active {
+  color: var(--accent);
+  background: var(--bg-primary);
+  border-color: var(--border);
+  position: relative;
+  top: 1px;
+}
+
+.sheet-tab .tab-usage {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+/* 可视化区域 */
+.visualization-area {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.board-container {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 40px 40px 40px 40px;
+}
+
+.board-svg {
+  display: block;
+  shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
+}
+
+/* 排版图缩放容器 */
+.board-zoom-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.board-zoom-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.94);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: var(--shadow-sm);
+}
+.zoom-btn {
+  min-width: 30px;
+  height: 28px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  line-height: 1;
+}
+.zoom-btn:hover { background: #f0efe9; }
+.zoom-btn:active { background: #e6e4dc; }
+.zoom-level {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 44px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.board-zoom-container {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+  background: #fafaf7;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.board-zoom-container:active { cursor: grabbing; }
+.board-zoom-inner {
+  position: relative;
+  display: inline-block;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.board-zoom-inner .board-container {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 24px;
+  margin: 0;
+}
+
+/* 尺寸标注 */
+.dimension-label {
+  font-size: 11px;
+  fill: var(--text-secondary);
+  font-family: inherit;
+}
+
+/* 结果占位 */
+.result-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.result-placeholder-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.result-placeholder-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.result-placeholder-desc {
+  font-size: 13px;
+  max-width: 320px;
+  line-height: 1.6;
+}
+
+/* 切割清单 */
+.cut-list-panel {
+  height: 200px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+}
+
+/* 折叠状态：只保留头部，为排版图腾出空间 */
+.cut-list-panel.collapsed { height: 40px; }
+.cut-list-panel.collapsed .cut-list-body { display: none; }
+
+.cut-list-header {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-light);
+  background: #f7f9fb;
+}
+
+.cut-list-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cut-list-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.cut-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.cut-table th {
+  position: sticky;
+  top: 0;
+  background: #f7f9fb;
+  padding: 6px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.cut-table td {
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.cut-table tr:hover td { background: #fafbfc; }
+
+.cut-table .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+.rotated-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+/* 算法设置 */
+.algorithm-settings {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border-light);
+  background: #fafbfc;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.algorithm-settings select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: inherit;
+  background: #fff;
+}
+
+/* Toast 提示 */
+.toast {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  padding: 10px 20px;
+  background: var(--bg-dark);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transition: all 0.25s;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast.error { background: var(--red); }
+.toast.success { background: var(--green); }
+
+/* 自定义确认弹窗 */
+.confirm-modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+}
+.confirm-modal.show { display: flex; }
+
+.confirm-mask {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.confirm-box {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  width: 340px;
+  max-width: 90vw;
+  padding: 22px 24px 18px;
+  animation: confirmPop 0.18s ease-out;
+}
+
+@keyframes confirmPop {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.confirm-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.confirm-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* 批量导入弹窗 */
+.import-box { width: 460px; }
+.import-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+.import-tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.import-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.import-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.ocr-warn {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border: 1px solid #f0c36d;
+  border-radius: 6px;
+  background: #fff7e0;
+  color: #8a6116;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.import-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+  background: #fafbfc;
+  color: var(--text-primary);
+}
+.import-textarea:focus { outline: none; border-color: var(--accent); }
+.import-format-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.import-format-hint code {
+  background: var(--bg-primary);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.import-file-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px;
+  border: 1.5px dashed var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.import-file-btn:hover { background: var(--bg-primary); border-color: var(--accent); }
+.ocr-image-wrap {
+  position: relative;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  display: inline-block;
+  max-width: 100%;
+  background: #fafafa;
+  line-height: 0;
+}
+.ocr-image-wrap img { display: block; max-width: 100%; max-height: 340px; height: auto; }
+.ocr-image-wrap canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+/* 图片灯箱：点击图片放大查看原图 */
+#ocrLightbox { position: fixed; inset: 0; z-index: 5000; display: none; align-items: center; justify-content: center; }
+.ocr-lb-mask { position: absolute; inset: 0; background: rgba(0,0,0,0.72); }
+.ocr-lb-box { position: relative; width: 94vw; max-width: 1000px; height: 92vh; max-height: 900px; background: #fff; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 8px 40px rgba(0,0,0,.3); }
+.ocr-lb-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; font-size: 13px; color: #666; border-bottom: 1px solid var(--border); flex: 0 0 auto; gap: 10px; }
+.ocr-lb-head .lb-tip { color: #999; font-size: 12px; font-weight: normal; }
+.ocr-lb-close { border: none; background: transparent; font-size: 24px; line-height: 1; cursor: pointer; color: #666; padding: 0 6px; border-radius: 6px; }
+.ocr-lb-close:hover { color: #d64545; background: #f2f2f2; }
+.ocr-lb-body { flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden; padding: 0; background: #fafafa; }
+.ocr-lb-imgwrap { flex: 1 1 auto; overflow: auto; padding: 16px; text-align: center; -webkit-overflow-scrolling: touch; }
+#ocrLbImg { max-width: 100%; max-height: 100%; height: auto; cursor: zoom-in; border-radius: 4px; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+#ocrLbImg.lb-raw { max-width: none; max-height: none; width: auto; height: auto; }
+.ocr-lb-summary { flex: 0 0 auto; max-height: 40%; overflow: auto; border-top: 1px solid var(--border); background: #fff; padding: 10px 14px; -webkit-overflow-scrolling: touch; }
+.ocr-lb-summary .lb-title { font-weight: 600; font-size: 13px; margin-bottom: 6px; color: #333; }
+.ocr-lb-summary table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ocr-lb-summary th, .ocr-lb-summary td { border: 1px solid #eee; padding: 4px 8px; text-align: center; }
+.ocr-lb-summary th { background: #f5f5f5; font-weight: 600; }
+.ocr-lb-summary .lb-empty { color: #999; font-size: 12px; padding: 8px 2px; }
+.ocr-lb-summary .lb-input { width: 74px; padding: 3px 6px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; text-align: center; box-sizing: border-box; }
+.ocr-lb-summary .lb-name { width: 110px; text-align: left; }
+.ocr-lb-summary td { padding: 3px 4px; }
+.ocr-lb-foot { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--border); background: #fff; }
+.ocr-lb-foot .lb-foot-tip { color: #999; font-size: 12px; }
+.ocr-conf-low { color: #e87722; font-weight: 600; }
+.import-preview {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  padding: 8px 10px;
+  max-height: 260px;
+  overflow: auto;
+}
+.import-preview-title { font-size: 12px; color: var(--text-primary); font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.import-merge-btn { margin-left: auto; }
+#importPreviewBody tr.pv-merged td { background: #fff2cc; }
+#importPreviewBody tr.pv-merged td:first-child { border-left: 4px solid #f0ad4e; }
+.import-preview-body { font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
+.import-preview-body table { border-collapse: collapse; width: 100%; }
+.import-preview-body th, .import-preview-body td {
+  border: 1px solid var(--border-light);
+  padding: 2px 4px;
+  text-align: left;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.import-preview-body th { background: var(--bg-secondary); color: var(--text-secondary); font-weight: 600; }
+.import-preview-body .warn { color: #d9534f; }
+.pv-input {
+  width: 64px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  background: #fff;
+  color: var(--text-primary);
+}
+.pv-input:focus { outline: none; border-color: var(--accent); }
+.pv-name { width: 90px; }
+.pv-del {
+  width: 22px;
+  height: 22px;
+  line-height: 20px;
+  text-align: center;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+.pv-del:hover { background: #fde8e8; color: #d9534f; }
+@media (max-width: 768px) {
+  .import-box { width: 92vw; }
+  .pv-input { width: 54px; }
+  .pv-name { width: 72px; }
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c5cdd6; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a8b2bd; }
+
+/* 打印 / PDF 导出专用视图（默认隐藏，仅打印时显示） */
+.print-area { display: none; }
+
+@media print {
+  @page { margin: 0; }
+  body { min-width: 0; background: #fff; }
+  .header, .sidebar, .stats-bar, .sheets-tabs, .cut-list-panel, .algorithm-settings, .mobile-view-tabs, .toast { display: none !important; }
+  .main { height: auto; display: block; }
+  .content { display: block; }
+  .visualization-area { display: none !important; }
+
+  .print-area {
+    display: block;
+    padding: 18mm 10mm 18mm 10mm;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #1a2332;
+  }
+
+  .print-sheet {
+    page-break-after: always;
+    padding: 10px 6px;
+  }
+  .print-sheet:last-child { page-break-after: auto; }
+  /* 第二个及之后的板材页：分页后 print-area 的 padding 不延续，需单独为每页顶部加留白（padding 不会被分页截断） */
+  .print-sheet + .print-sheet { padding-top: 18mm; }
+
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 2px solid #1e2a3a;
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+  }
+  .print-header h2 { font-size: 15px; margin: 0; }
+  .print-header .print-meta { font-size: 11px; color: #5a6a7e; }
+
+  .print-stats {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 14px;
+    font-size: 12px;
+  }
+  .print-stats b { font-size: 13px; }
+  .print-stats .u { color: #2e9e5b; }
+  .print-stats .w { color: #d64545; }
+  .print-stats .e { color: #e87722; }
+
+  .print-svg-wrap {
+    border: 1px solid #d9dee5;
+    padding: 8px;
+    margin-bottom: 8px;
+    display: inline-block;
+  }
+  .print-svg-wrap svg { max-width: 100%; height: auto; }
+
+  .print-sheet-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .print-list {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 10px;
+  }
+  .print-list th {
+    background: #f0f2f5;
+    padding: 4px 8px;
+    text-align: left;
+    border: 1px solid #d9dee5;
+    font-weight: 600;
+  }
+  .print-list td {
+    padding: 3px 8px;
+    border: 1px solid #e8ecf0;
+  }
+  .print-list .num { text-align: right; font-variant-numeric: tabular-nums; }
+}
+
+/* ========== 页面底部署名 ========== */
+.app-footer {
+  margin-top: auto;
+  padding: 8px 14px 10px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  user-select: none;
+}
+
+/* ========== 历史方案面板 ========== */
+.plan-history {
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.plan-list { flex: 1; overflow-y: auto; padding: 8px; }
+.plan-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  background: #fff;
+}
+.plan-item:hover { border-color: var(--accent); }
+.plan-info { flex: 1; min-width: 0; }
+.plan-name {
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plan-name:hover { color: var(--accent); }
+.plan-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.plan-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+/* ========== 移动端视图切换与响应式 ========== */
+.mobile-view-tabs { display: none; }
+
+@media (max-width: 768px) {
+  body { min-width: 0; }
+  .header {
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 12px 14px;
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+    gap: 6px;
+    position: sticky;
+    top: 0;
+    z-index: 700;
+  }
+  /* 移动端顶部文字提亮：所有文字一律配白底深字，任何环境下都清晰可读 */
+  .header-left .header-title {
+    display: inline-block;
+    background: #ffffff;
+    color: #1e2a3a;
+    padding: 3px 12px;
+    border-radius: 4px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .header-right .btn { font-weight: 600; }
+  .header-right .btn-outline {
+    background: #ffffff;
+    color: #1e2a3a;
+    border-color: rgba(30,42,58,0.25);
+  }
+  /* 「开始排版」保持默认主按钮样式（橙底白字），不做移动端覆盖 */
+  .header-title { font-size: 15px; }
+  .header-subtitle { display: none; }
+  .main { flex-direction: column; height: auto; overflow: visible; }
+  .sidebar { width: 100%; min-width: 0; border-right: none; }
+  .content { display: none; }
+  .main.show-result .sidebar { display: none; }
+  .main.show-result .content { display: flex; }
+  .mobile-view-tabs {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 600;
+    background: var(--bg-dark);
+    padding: 6px 10px;
+    gap: 8px;
+  }
+  .mob-tab {
+    flex: 1;
+    padding: 9px 0;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: rgba(255,255,255,0.8);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .mob-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .form-row { flex-wrap: wrap; }
+  .add-part-grid { grid-template-columns: 1fr; }
+  .parts-list { max-height: 38vh; }
+  .plan-history { max-height: 220px; }
+  .stats-bar { flex-wrap: wrap; padding: 10px 12px; }
+  .stat-card { flex: 1 1 42%; }
+  .visualization-area { padding: 10px; }
+  .board-zoom-container { height: 420px; flex: none; }
+  .board-zoom-inner .board-container { padding: 16px; }
+  .board-svg { max-width: none; height: auto; }
+  .sheets-tabs { padding: 6px 12px 0; }
+  .cut-list-panel { height: 240px; }
+  .algorithm-settings { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .toast { max-width: 90vw; text-align: center; }
+
+  /* ===== 移动端表单文字对比度增强 ===== */
+  .form-label {
+    color: #1a2332;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .form-input {
+    font-size: 15px;
+    color: #1a2332;
+    padding: 10px 12px;
+  }
+  .algorithm-settings {
+    color: #1a2332;
+    font-size: 14px;
+  }
+  .algorithm-settings span {
+    font-weight: 600;
+  }
+  .algorithm-settings select {
+    font-size: 15px;
+    color: #1a2332;
+    background: #fff;
+    padding: 8px 28px 8px 10px;
+  }
+  select option {
+    color: #1a2332;
+    background: #fff;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-view-tabs { display: none !important; }
+}
+</style>
+</head>
+<body>
+<!-- ========== 顶部栏 ========== -->
+<header class="header">
+  <div class="header-left">
+    <div class="header-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="1"></rect>
+        <line x1="3" y1="9" x2="21" y2="9"></line>
+        <line x1="9" y1="21" x2="9" y2="9"></line>
+      </svg>
+    </div>
+    <div>
+      <span class="header-title">专业板材切割排版优化系统</span>
+      <span class="header-subtitle">Board Cutting Optimizer</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-outline btn-sm" id="btnSavePlan" title="将当前输入保存为历史方案">保存方案</button>
+    <button class="btn btn-outline btn-sm" id="btnClearAll">清空数据</button>
+    <button class="btn btn-primary btn-sm" id="btnOptimize">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+      开始排版
+    </button>
+  </div>
+</header>
+
+<!-- 移动端视图切换（仅 ≤768px 显示） -->
+<div class="mobile-view-tabs" id="mobileTabs">
+  <button class="mob-tab active" data-view="input">① 输入设置</button>
+  <button class="mob-tab" data-view="result">② 排版结果</button>
+</div>
+
+<!-- ========== 主布局 ========== -->
+<div class="main">
+
+  <!-- 左侧输入面板 -->
+  <aside class="sidebar">
+
+    <!-- 原材料设置 -->
+    <div class="panel-section">
+      <div class="panel-header">
+        <span class="panel-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+          原材料设置
+        </span>
+      </div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">板材长度 (mm)</label>
+            <input type="number" class="form-input" id="sheetWidth" value="2440" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">板材宽度 (mm)</label>
+            <input type="number" class="form-input" id="sheetHeight" value="1220" min="1" step="1">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">板材种类</label>
+            <select class="form-input" id="sheetType">
+              <option value="normal">普通板（可自由旋转）</option>
+              <option value="textured">纹理板（方向一致）</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">板材数量</label>
+            <select class="form-input" id="sheetCount">
+              <option value="0">自动（按需开板）</option>
+              <option value="1">1 张</option>
+              <option value="2">2 张</option>
+              <option value="3">3 张</option>
+              <option value="5">5 张</option>
+              <option value="10">10 张</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">锯缝宽度 (mm)</label>
+            <input type="number" class="form-input" id="sawKerf" value="4" min="0" step="0.5">
+          </div>
+          <div class="form-group">
+            <label class="form-label" id="sheetTypeHint" style="display:none;">纹理板：零件方向自动一致</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 零件清单 -->
+    <div class="panel-section" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+      <div class="panel-header">
+        <span class="panel-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+          零件清单
+          <span id="partsCount" style="font-weight:400; color:var(--text-muted); font-size:12px;">(0 种)</span>
+        </span>
+      </div>
+      <div class="parts-list" id="partsList">
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </div>
+          <div class="empty-state-text">暂无零件，请在下方添加</div>
+        </div>
+      </div>
+
+      <!-- 添加零件 -->
+      <div class="add-part-form">
+        <div class="add-part-grid">
+          <div class="form-group full">
+            <label class="form-label">零件名称</label>
+            <input type="text" class="form-input" id="partName" placeholder="留空自动编号（1、2、3…）">
+          </div>
+          <div class="form-group">
+            <label class="form-label">长 (mm)</label>
+            <input type="number" class="form-input" id="partWidth" placeholder="600" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">宽 (mm)</label>
+            <input type="number" class="form-input" id="partHeight" placeholder="400" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">数量</label>
+            <input type="number" class="form-input" id="partQty" placeholder="1" min="1" step="1">
+          </div>
+          <div class="form-group" style="justify-content:flex-end;">
+            <label class="checkbox-row" style="margin-bottom:0;" id="partRotatableLabel">
+              <input type="checkbox" id="partRotatable" checked>
+              <span id="partRotatableText">允许90°旋转</span>
+            </label>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%; justify-content:center;" id="btnAddPart">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          添加零件
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center; margin-top:8px;" onclick="openImportModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          批量导入
+        </button>
+      </div>
+    </div>
+
+    <!-- 算法设置 -->
+    <div class="algorithm-settings">
+      <span>排版策略：</span>
+      <select id="strategySelect">
+        <option value="auto">自动择优（推荐）</option>
+        <option value="COM">紧凑聚边 (COM)</option>
+        <option value="BSSF">最短边优先 (BSSF)</option>
+        <option value="BLSF">最长边优先 (BLSF)</option>
+        <option value="BAF">面积最适配 (BAF)</option>
+        <option value="BL">左下角优先 (BL)</option>
+      </select>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.34</span>
+    </div>
+
+    <!-- 历史方案 -->
+    <div class="panel-section plan-history">
+      <div class="panel-header">
+        <span class="panel-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          历史方案
+          <span id="planCount" style="font-weight:400; color:var(--text-muted); font-size:12px;">(0)</span>
+        </span>
+        <button class="btn btn-ghost btn-sm" id="btnClearPlans">清空</button>
+      </div>
+      <div class="plan-list" id="planList">
+        <div class="empty-state"><div class="empty-state-text">暂无保存的方案<br>输入方案后点右上角「保存方案」</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 右侧内容区 -->
+  <main class="content">
+
+    <!-- 统计栏 -->
+    <div class="stats-bar" id="statsBar" style="display:none;">
+      <div class="stat-card sheets">
+        <div class="stat-label">使用板材</div>
+        <div class="stat-value" id="statSheets">0<span class="unit">张</span></div>
+      </div>
+      <div class="stat-card used">
+        <div class="stat-label">已用面积</div>
+        <div class="stat-value green" id="statUsed">0<span class="unit">m²</span></div>
+      </div>
+      <div class="stat-card waste">
+        <div class="stat-label">损耗面积</div>
+        <div class="stat-value red" id="statWaste">0<span class="unit">m²</span></div>
+      </div>
+      <div class="stat-card efficiency">
+        <div class="stat-label">综合利用率</div>
+        <div class="stat-value orange" id="statEfficiency">0<span class="unit">%</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">零件总数</div>
+        <div class="stat-value" id="statParts">0<span class="unit">件</span></div>
+      </div>
+    </div>
+
+    <!-- 板材标签页 -->
+    <div class="sheets-tabs" id="sheetsTabs" style="display:none;"></div>
+
+    <!-- 可视化区域 -->
+    <div class="visualization-area" id="visualizationArea">
+      <div class="result-placeholder">
+        <div class="result-placeholder-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+            <rect x="2" y="2" width="20" height="20" rx="2"/>
+            <rect x="4" y="4" width="8" height="6" rx="1"/>
+            <rect x="14" y="4" width="6" height="4" rx="1"/>
+            <rect x="4" y="12" width="5" height="8" rx="1"/>
+            <rect x="11" y="10" width="9" height="10" rx="1"/>
+          </svg>
+        </div>
+        <div class="result-placeholder-title">等待排版计算</div>
+        <div class="result-placeholder-desc">在左侧设置原材料尺寸，添加需要切割的零件清单，然后点击「开始排版」按钮，系统将自动计算最优切割方案。</div>
+      </div>
+    </div>
+
+    <!-- 切割清单 -->
+    <div class="cut-list-panel" id="cutListPanel" style="display:none;">
+      <div class="cut-list-header">
+        <span class="cut-list-title">切割清单</span>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button type="button" class="btn btn-ghost btn-sm" id="btnToggleCutList" title="折叠/展开切割清单，为排版图腾出空间">折叠</button>
+          <button class="btn btn-ghost btn-sm" id="btnExportCSV">导出CSV</button>
+          <button class="btn btn-ghost btn-sm" id="btnExportPDF">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+            导出PDF
+          </button>
+        </div>
+      </div>
+      <div class="cut-list-body">
+        <table class="cut-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>零件名称</th>
+              <th class="num">切割尺寸 (mm)</th>
+              <th>所在板材</th>
+              <th class="num">X 坐标</th>
+              <th class="num">Y 坐标</th>
+              <th>旋转</th>
+              <th class="num">面积 (m²)</th>
+            </tr>
+          </thead>
+          <tbody id="cutTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="app-footer">开发：@Kase&炆燃科技</div>
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- 自定义确认弹窗（替代浏览器原生 confirm，避免预览环境被拦截） -->
+<div class="confirm-modal" id="confirmModal">
+  <div class="confirm-mask" id="confirmMask"></div>
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirmTitle">确认操作</div>
+    <div class="confirm-message" id="confirmMessage">确定要执行此操作吗？</div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost btn-sm" id="confirmCancel">取消</button>
+      <button class="btn btn-primary btn-sm" id="confirmOk">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 命名输入弹窗（历史方案命名/重命名） -->
+<div class="confirm-modal" id="promptModal">
+  <div class="confirm-mask" id="promptMask"></div>
+  <div class="confirm-box">
+    <div class="confirm-title" id="promptTitle">方案命名</div>
+    <input type="text" class="form-input" id="promptInput" placeholder="输入方案名称" maxlength="40" style="margin-bottom:14px;">
+    <div class="confirm-actions">
+      <button class="btn btn-ghost btn-sm" id="promptCancel">取消</button>
+      <button class="btn btn-primary btn-sm" id="promptOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 批量导入弹窗 -->
+<div class="confirm-modal" id="importModal">
+  <div class="confirm-mask" id="importMask"></div>
+  <div class="confirm-box import-box">
+    <div class="confirm-title">批量导入零件</div>
+    <div class="import-tabs">
+      <button type="button" class="import-tab active" id="importTabPaste" onclick="switchImportTab('paste')">粘贴数据</button>
+      <button type="button" class="import-tab" id="importTabFile" onclick="switchImportTab('file')">选择文件</button>
+      <button type="button" class="import-tab" id="importTabImage" onclick="switchImportTab('image')">图片识别</button>
+    </div>
+
+    <div id="importPanePaste">
+      <div class="import-hint">从 Excel / 微信 / 记事本复制数据，直接粘贴到下面（每行一个零件）</div>
+      <textarea id="importText" class="import-textarea" rows="7" placeholder="示例：
+柜体侧板,600,1800,2
+门板,890,590,4
+600×400,6"></textarea>
+      <div class="import-format-hint">
+        支持格式：<code>名称,长,宽,数量</code>，数量可省略（默认1），名称可省略（自动编号）。
+        逗号 / Tab / 空格 / 乘号(×) 均可分隔。
+      </div>
+    </div>
+
+    <div id="importPaneFile" style="display:none;">
+      <div class="import-hint">选择 Excel(.xlsx/.xls) 或 CSV 文件，自动读取「名称 / 长 / 宽 / 数量」列</div>
+      <label class="import-file-btn" id="importFileLabel">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        点击选择文件
+        <input type="file" id="importFileInput" accept=".csv,.tsv,.txt,.xlsx,.xls" style="display:none;" onchange="handleImportFile(this)">
+      </label>
+      <div class="import-format-hint" id="importFileName">未选择文件</div>
+    </div>
+
+    <div id="importPaneImage" style="display:none;">
+      <div class="ocr-warn">⚠ 图片识别功能不完善，仅作辅助录入，识别出的每条尺寸都需要人工逐条核验后再使用</div>
+      <div class="import-hint">上传 CAD / 设计图截图或客户手绘图，自动识别图中的尺寸。识别后图上会标出每个数字的位置（橙框=置信度低，需重点核对），下方预览可修改 / 删除。</div>
+      <label class="import-file-btn" id="importImageLabel">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        点击选择图片
+        <input type="file" id="importImageInput" accept="image/*" style="display:none;" onchange="handleImportImage(this)">
+      </label>
+      <div class="import-format-hint" id="importImageName">未选择图片（支持 JPG / PNG / 截图 / 照片）</div>
+      <div id="ocrStatus" class="import-format-hint" style="display:none;"></div>
+      <div id="ocrImageWrap" class="ocr-image-wrap" style="display:none;" onclick="openOcrLightbox()" title="点击放大查看原图">
+        <img id="ocrImage" alt="原图">
+      </div>
+      <div id="ocrImageHint" class="import-format-hint" style="display:none; cursor:pointer; margin-top:4px;" onclick="openOcrLightbox()">🖼 点击图片可放大查看原图（用于核对尺寸）</div>
+      <div id="ocrActions" style="margin-top:8px; display:none;">
+        <button type="button" class="btn btn-primary btn-sm" id="ocrRunBtn" onclick="runImageOcr()">开始识别尺寸</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="ocrClearBtn" onclick="clearOcrResult()" style="display:none;">清除识别结果</button>
+      </div>
+    </div>
+
+    <div id="importPreview" class="import-preview" style="display:none;">
+      <div class="import-preview-title">
+        识别结果预览 <span id="importPreviewCount"></span>
+        <button type="button" class="btn btn-primary btn-sm import-merge-btn" id="importMergeBtn" onclick="mergePreviewRows()" title="相同名称+尺寸的零件数量合并为一行">合并重复</button>
+      </div>
+      <div id="importPreviewBody" class="import-preview-body"></div>
+      <div class="import-format-hint" id="importPreviewNote"></div>
+    </div>
+
+    <div class="confirm-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost btn-sm" onclick="closeImportModal()">取消</button>
+      <button class="btn btn-primary btn-sm" id="importOk" onclick="importFromText()">导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- 原图放大查看灯箱 -->
+<div id="ocrLightbox">
+  <div class="ocr-lb-mask" onclick="closeOcrLightbox()"></div>
+  <div class="ocr-lb-box">
+    <div class="ocr-lb-head">
+      <span>原图查看 <span class="lb-tip">点击图片切换「适应窗口 / 原始大小」，滚动或拖动查看细节</span></span>
+      <button type="button" class="ocr-lb-close" onclick="closeOcrLightbox()" title="关闭">×</button>
+    </div>
+    <div class="ocr-lb-body">
+      <div class="ocr-lb-imgwrap">
+        <img id="ocrLbImg" alt="原图" onclick="toggleOcrLbZoom()">
+      </div>
+      <div class="ocr-lb-summary" id="ocrLbSummary"></div>
+      <div class="ocr-lb-foot">
+        <span class="lb-foot-tip">可在上方表格直接修改尺寸 / 数量，关闭后自动保存到识别结果</span>
+        <button type="button" class="btn btn-primary btn-sm" onclick="closeOcrLightbox()">完成并返回</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+
+/* ================================================================
+   板材切割排版优化系统
+   核心算法：Max Rectangles Bin Packing + 多启发式择优
+   ================================================================ */
+
+// ========== 应用状态 ==========
+const state = {
+  parts: [],          // 零件种类列表
+  results: null,      // 排版结果
+  activeSheet: 0,     // 当前查看的板材索引
+  nextPartId: 1,
+  editingId: null,    // 当前正在编辑名称的零件 id
+  editingQtyId: null, // 当前正在编辑数量的零件 id
+  colorPalette: [
+    '#4A90D9', '#E87722', '#2E9E5B', '#9B59B6', '#E74C3C',
+    '#1ABC9C', '#F39C12', '#34495E', '#D35400', '#27AE60',
+    '#8E44AD', '#C0392B', '#16A085', '#D4AC0D', '#2C3E50',
+    '#CB4335', '#2874A6', '#1E8449', '#7D3C98', '#B9770E'
+  ]
+};
+
+// ========== 工具函数 ==========
+function $(id) { return document.getElementById(id); }
+
+function showToast(msg, type = '') {
+  const toast = $('toast');
+  toast.textContent = msg;
+  toast.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.className = 'toast'; }, 2500);
+}
+
+function formatArea(mm2) {
+  return (mm2 / 1000000).toFixed(3);
+}
+
+function generatePartColor(index) {
+  return state.colorPalette[index % state.colorPalette.length];
+}
+
+// ========== 零件管理 ==========
+function addPart() {
+  let name = $('partName').value.trim();
+  const width = parseFloat($('partWidth').value);
+  const height = parseFloat($('partHeight').value);
+  const qtyRaw = $('partQty').value.trim();
+  const qty = qtyRaw === '' ? 1 : parseInt(qtyRaw);
+  const rotatable = $('partRotatable').checked;
+
+  // 名称留空时自动用序号命名（接着当前自动编号的最大序号）
+  let autoNamed = false;
+  if (!name) {
+    let maxSeq = 0;
+    for (const p of state.parts) {
+      if (p.autoNamed) {
+        const n = parseInt(p.name, 10);
+        if (!isNaN(n) && n > maxSeq) maxSeq = n;
+      }
+    }
+    name = String(maxSeq + 1);
+    autoNamed = true;
+  }
+  if (!width || width <= 0) { showToast('请输入有效的零件长度', 'error'); return; }
+  if (!height || height <= 0) { showToast('请输入有效的零件宽度', 'error'); return; }
+  if (!qty || qty <= 0) { showToast('请输入有效的数量', 'error'); return; }
+
+  state.parts.push({
+    id: state.nextPartId++,
+    name,
+    width,
+    height,
+    qty,
+    rotatable,
+    autoNamed,
+    color: generatePartColor(state.parts.length)
+  });
+
+  // 清空表单，光标默认落在「长」尺寸框
+  $('partName').value = '';
+  $('partWidth').value = '';
+  $('partHeight').value = '';
+  $('partQty').value = '';
+  $('partWidth').focus();
+  $('partWidth').select();
+
+  renderPartsList();
+  showToast('已添加零件：' + name, 'success');
+}
+
+// ========== 批量导入 ==========
+
+function openImportModal() {
+  $('importText').value = '';
+  $('importFileInput').value = '';
+  $('importFileName').textContent = '未选择文件';
+  $('importPreview').style.display = 'none';
+  resetImageImport();
+  switchImportTab('paste');
+  $('importModal').classList.add('show');
+  setTimeout(() => { const t = $('importText'); if (t) t.focus(); }, 100);
+}
+
+function closeImportModal() {
+  $('importModal').classList.remove('show');
+}
+
+function switchImportTab(tab) {
+  const isPaste = tab === 'paste';
+  const isFile = tab === 'file';
+  const isImage = tab === 'image';
+  $('importTabPaste').classList.toggle('active', isPaste);
+  $('importTabFile').classList.toggle('active', isFile);
+  $('importTabImage').classList.toggle('active', isImage);
+  $('importPanePaste').style.display = isPaste ? '' : 'none';
+  $('importPaneFile').style.display = isFile ? '' : 'none';
+  $('importPaneImage').style.display = isImage ? '' : 'none';
+}
+
+/**
+ * 解析导入文本 → 零件列表 [{name, width, height, qty}]
+ * 优先按表格列结构解析（CSV/TSV/Excel 粘贴数据），失败时兜底单行灵活解析。
+ */
+function parseImportText(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return [];
+
+  // 尝试表格列解析（能处理：表头、序号列、尺寸合写列 600×1800）
+  const tabular = parseTabularData(lines);
+  if (tabular && tabular.length > 0) return tabular;
+
+  // 兜底：单行灵活解析（无结构纯文本）
+  const rows = [];
+  for (const line of lines) {
+    const part = parseImportLine(line);
+    if (part) rows.push(part);
+  }
+  return rows;
+}
+
+// ---------- 表格列解析 ----------
+
+/** 探测分隔符（逗号/Tab/分号/竖线，取出现次数最多的） */
+function detectDelimiter(lines) {
+  const candidates = [',', '\t', ';', '|'];
+  let best = ',', bestCount = 0;
+  for (const d of candidates) {
+    let count = 0;
+    for (let i = 0; i < Math.min(8, lines.length); i++) {
+      count += lines[i].split(d).length - 1;
+    }
+    if (count > bestCount) { bestCount = count; best = d; }
+  }
+  return bestCount > 0 ? best : ',';
+}
+
+/** 解析一行 CSV（支持引号包裹） */
+function parseCSVLine(line, delim) {
+  const cells = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false;
+      } else cur += c;
+    } else if (c === '"') inQ = true;
+    else if (c === delim) { cells.push(cur.trim()); cur = ''; }
+    else cur += c;
+  }
+  cells.push(cur.trim());
+  return cells;
+}
+
+/** 提取字符串中所有数字 */
+function extractNums(str) {
+  const m = String(str).match(/\d+(?:\.\d+)?/g);
+  return m ? m.map(parseFloat) : [];
+}
+function firstNum(str) {
+  const n = extractNums(str);
+  return n.length > 0 ? n[0] : 0;
+}
+
+const IMPORT_HEADER_KW = {
+  name: ['名称', '零件', '品名', '部件', '构件', '项目', '用途', '材质'],
+  width: ['长', '尺寸'],
+  height: ['宽'],
+  qty: ['数量', '张数', '件数', '块数', '片数', '个数'],
+  size: ['规格', '尺寸'],
+  skip: ['序号', '编号', '备注', '单价', '金额', '面积', '重量', '总价', '小计', '厚度', '厚']
+};
+
+/** 找表头行：前几行中文本多、含尺寸/数量关键词、数字少的行 */
+function findHeaderRow(rows) {
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const cells = rows[i].map(c => String(c).trim());
+    let textHit = 0, numCells = 0;
+    for (const c of cells) {
+      if (/[a-zA-Z\u4e00-\u9fa5]/.test(c)) textHit++;
+      if (/\d/.test(c)) numCells++;
+    }
+    const hasDimKw = cells.some(c => /长|宽|高|深|尺寸|规格|数量|张数|件数|块数|名称/.test(c));
+    if (textHit >= 2 && hasDimKw && numCells <= 1) return i;
+  }
+  return -1;
+}
+
+/** 分析每列特征 */
+function analyzeColumns(rows, headerIdx, maxCols) {
+  const dataRows = headerIdx >= 0 ? rows.slice(headerIdx + 1) : rows;
+  const cols = [];
+  for (let c = 0; c < maxCols; c++) {
+    const vals = [];
+    for (const r of dataRows) {
+      if (r[c] !== undefined && String(r[c]).trim() !== '') vals.push(String(r[c]).trim());
+    }
+    if (vals.length === 0) { cols.push({ c, empty: true }); continue; }
+    const allNum = vals.every(v => /^-?\d+(?:\.\d+)?$/.test(v));
+    const numsOf = vals.map(v => extractNums(v));
+    const containsMulti = numsOf.some(n => n.length >= 2);
+    const containsText = vals.some(v => /[a-zA-Z\u4e00-\u9fa5]/.test(v));
+    const hasDimMarker = vals.some(v => /[×xX*]/.test(v));
+    let increasing = false;
+    if (allNum && vals.length >= 2) {
+      const nums = vals.map(parseFloat);
+      // 序号列特征：连续递增（步长1），或从1开始整体递增
+      const stepOne = nums.every((n, i) => i === 0 || n === nums[i - 1] + 1);
+      const startOne = nums[0] === 1 && nums.every((n, i) => i === 0 || n > nums[i - 1]);
+      increasing = stepOne || startOne;
+    }
+    cols.push({ c, vals, allNum, containsMulti, containsText, hasDimMarker, increasing, empty: false });
+  }
+  return cols;
+}
+
+/** 有表头时按列名映射（长/宽/高/深 优先；"规格/尺寸"合写列仅在没有明确尺寸列时启用） */
+function mapColumnsByHeader(rows, headerIdx) {
+  const header = rows[headerIdx].map(c => String(c).trim());
+  const map = { name: -1, width: -1, height: -1, qty: -1, size: -1 };
+  header.forEach((h, i) => {
+    if (map.name < 0 && IMPORT_HEADER_KW.name.some(k => h.includes(k)) && !IMPORT_HEADER_KW.skip.some(k => h.includes(k))) map.name = i;
+    if (map.qty < 0 && IMPORT_HEADER_KW.qty.some(k => h.includes(k))) map.qty = i;
+  });
+
+  // 明确尺寸列（长/宽/高/深），排除"厚度/序号/编号"
+  const dimIdx = [];
+  header.forEach((h, i) => {
+    if (/长|宽|高|深/.test(h) && !/厚度|厚|序号|编号/.test(h)) dimIdx.push(i);
+  });
+  // 合写尺寸列（"规格/尺寸"），排除墙体/墙/洞口/窗/门洞等非板材尺寸语义
+  const sizeIdx = [];
+  header.forEach((h, i) => {
+    if (/规格|尺寸/.test(h) && !/墙体|墙|洞口|窗|门洞/.test(h)) sizeIdx.push(i);
+  });
+
+  if (dimIdx.length >= 2) {
+    // 优先"长"作第一个、"宽"作第二个；其余情况按表头顺序取前两个尺寸列
+    const longIdx = header.findIndex(h => h.includes('长'));
+    const wideIdx = header.findIndex(h => h.includes('宽'));
+    let a = longIdx >= 0 ? longIdx : dimIdx[0];
+    let b = (wideIdx >= 0 && wideIdx !== a) ? wideIdx : dimIdx.find(i => i !== a);
+    map.width = a;
+    map.height = b !== undefined ? b : a;
+    // 已有明确尺寸列，忽略"规格/尺寸"合写列（避免把墙体尺寸误当成板材）
+  } else if (dimIdx.length === 1) {
+    // 只有一个明确尺寸列，用合写列补另一个尺寸
+    map.width = dimIdx[0];
+    map.height = dimIdx[0];
+    if (sizeIdx.length > 0) map.size = sizeIdx[0];
+  } else {
+    // 无明确长/宽/高/深列，退而用"规格/尺寸"合写列拆分
+    if (sizeIdx.length > 0) map.size = sizeIdx[0];
+  }
+  return map;
+}
+
+/** 无表头时按列特征探测 */
+function mapColumnsByProbe(cols) {
+  const map = { name: -1, width: -1, height: -1, qty: -1, size: -1 };
+  // 名称列：含文本且非纯数字、非尺寸合写
+  for (const col of cols) {
+    if (!col.empty && col.containsText && !col.allNum && !col.containsMulti) { map.name = col.c; break; }
+  }
+  // 尺寸合写列（如 "600×1800"）
+  for (const col of cols) {
+    if (!col.empty && (col.hasDimMarker || col.containsMulti)) { map.size = col.c; break; }
+  }
+  // 纯数字列（排除递增序号列、排除尺寸合写列），按列顺序：长、宽、数量
+  const pureNums = cols.filter(col => !col.empty && col.allNum && !col.increasing && col.c !== map.size);
+  if (map.size >= 0) {
+    if (pureNums.length >= 1) map.qty = pureNums[0].c;
+  } else {
+    if (pureNums.length >= 1) map.width = pureNums[0].c;
+    if (pureNums.length >= 2) map.height = pureNums[1].c;
+    if (pureNums.length >= 3) map.qty = pureNums[2].c;
+  }
+  return map;
+}
+
+/** 表格整体解析：返回零件数组，不适合表格时返回 null */
+function parseTabularData(lines) {
+  if (lines.length === 0) return null;
+  const delim = detectDelimiter(lines);
+  const rows = lines.map(l => parseCSVLine(l, delim));
+  const maxCols = Math.max(...rows.map(r => r.length));
+  if (maxCols < 2) return null; // 单列交给单行解析
+  // 表格门槛：至少 2 行有 ≥2 个非空单元格（排除"仅一行多列"的标注图/草图）
+  const multiColRows = rows.filter(r => r.filter(c => String(c).trim() !== '').length >= 2).length;
+  if (multiColRows < 2) return null;
+
+  const headerIdx = findHeaderRow(rows);
+  const cols = analyzeColumns(rows, headerIdx, maxCols);
+  const map = headerIdx >= 0 ? mapColumnsByHeader(rows, headerIdx) : mapColumnsByProbe(cols);
+  const dataRows = headerIdx >= 0 ? rows.slice(headerIdx + 1) : rows;
+
+  // 严格尺寸模式：表头有明确的长宽列时，尺寸缺失的行视为无效（空行/统计行），不兜底乱取数
+  const strictDim = map.width >= 0 && map.height >= 0 && map.width !== map.height;
+
+  const parts = [];
+  for (const row of dataRows) {
+    if (!row.some(c => String(c).trim() !== '')) continue; // 全空行
+    // 跳过统计/汇总行（合计、总计、小计、统计、汇总、平均等，其数字不是板材尺寸）
+    if (row.some(c => /合计|总计|小计|统计|汇总|平均|均值/.test(String(c)))) continue;
+    // 跳过几乎为空的行（如只有 1 个序号，后面无数据）
+    const nonEmpty = row.filter(c => String(c).trim() !== '').length;
+    if (nonEmpty <= 1) continue;
+    const part = extractPartFromRow(row, map, strictDim);
+    if (part) parts.push(part);
+  }
+  return parts;
+}
+
+/** 从一行单元格中按列映射提取零件 */
+function extractPartFromRow(row, map, strictDim) {
+  const get = (idx) => (idx >= 0 && row[idx] !== undefined) ? String(row[idx]).trim() : '';
+
+  let name = get(map.name);
+  if (name && /^[\d.,\-]+$/.test(name)) name = ''; // 名称列其实是数字（序号/编码），丢弃
+
+  let width = 0, height = 0, qty = 1;
+
+  // 尺寸合写列优先（如 "600×1800"）
+  if (map.size >= 0) {
+    const nums = extractNums(get(map.size));
+    if (nums.length >= 2) { width = nums[0]; height = nums[1]; }
+    else if (nums.length === 1) { width = nums[0]; height = nums[0]; }
+  }
+  // 单独的长 / 宽列
+  if (width <= 0 && map.width >= 0) width = firstNum(get(map.width));
+  if (height <= 0 && map.height >= 0) height = firstNum(get(map.height));
+  // 数量列
+  if (map.qty >= 0) {
+    const q = firstNum(get(map.qty));
+    if (q > 0) qty = Math.round(q);
+  }
+  // 严格模式：已有明确长宽列，但该行尺寸缺失 → 视为无效行（空行/汇总行），不兜底乱取数
+  if (strictDim && (width <= 0 || height <= 0)) return null;
+  // 宽松兜底：无明确长宽列时，才从整行其余数字中补（跳过已知列与合写尺寸列）
+  if (width <= 0 || height <= 0) {
+    const used = new Set([map.name, map.size, map.width, map.height, map.qty].filter(i => i >= 0));
+    const rest = [];
+    for (let i = 0; i < row.length; i++) {
+      if (used.has(i)) continue;
+      const v = get(i);
+      // 跳过合写尺寸列（如"墙体尺寸 611*2750"），这类列不是单个尺寸，不应被兜底取用
+      if (/[×xX*]/.test(v)) continue;
+      rest.push(...extractNums(v));
+    }
+    if (width <= 0 && rest.length > 0) width = rest.shift();
+    if (height <= 0 && rest.length > 0) height = rest.shift();
+  }
+
+  // 尺寸合理性下限：板材零件不可能小于 10mm，过小视为无效行（多为图号/序号/残留数字）
+  const MIN_PART_DIM = 10;
+  if (width < MIN_PART_DIM || height < MIN_PART_DIM) return null;
+
+  if (!(width > 0) || !(height > 0) || !(qty > 0)) return null;
+  return { name, width, height, qty };
+}
+
+/** 单行灵活解析（兜底，无列结构时用） */
+function parseImportLine(line) {
+  // 剔除孔径/孔距标注（φ30 / ø30 / Φ30 等），这些不是板材尺寸
+  let clean = line.replace(/[φΦøØ]\s*\d+(?:\.\d+)?/g, ' ');
+  const nums = extractNums(clean);
+  if (nums.length === 0) return null;
+
+  // 数量识别："X片/X张/X块/X件/共X张/×X片" 等，数量数字从尺寸候选里剔除
+  let qty = 1;
+  const qm = clean.match(/(?:共|约|×|x|X|\*)?\s*(\d+)\s*(?:片|张|块|件)\b/);
+  if (qm) {
+    const q = parseInt(qm[1], 10);
+    if (q > 0 && q < 100000) {
+      qty = q;
+      const qi = nums.indexOf(q);
+      if (qi >= 0) nums.splice(qi, 1);
+    }
+  }
+
+  const textOnly = clean.replace(/\d+(?:\.\d+)?/g, ' ');
+  const nameMatch = textOnly.match(/[a-zA-Z\u4e00-\u9fa5][a-zA-Z\u4e00-\u9fa5\s]*/);
+  const name = nameMatch ? nameMatch[0].trim() : '';
+
+  const width = nums[0];
+  const height = nums[1] !== undefined ? nums[1] : nums[0];
+  // 未通过数量词识别出数量时，才用第 3 个数字作为数量
+  if (nums[2] !== undefined) qty = Math.round(nums[2]);
+  // 尺寸合理性下限：板材零件不可能小于 10mm，过小视为无效（数量/序号/图号等残留数字）
+  if (width < 10 || height < 10) return null;
+  if (!(width > 0) || !(height > 0) || !(qty > 0)) return null;
+  return { name, width, height, qty };
+}
+
+/** 渲染可编辑预览表格（list: [{name,width,height,qty}]） */
+function renderPreviewTable(list, noteText, mergedKeys) {
+  const body = $('importPreviewBody');
+  const count = $('importPreviewCount');
+  const note = $('importPreviewNote');
+  count.textContent = `（${list.length} 行）`;
+  let html = '<table><tr><th>名称</th><th>长(mm)</th><th>宽(mm)</th><th>数量</th><th></th></tr>';
+  for (const p of list) {
+    const key = (p.name || '') + '|' + p.width + '|' + p.height;
+    const cls = (mergedKeys && mergedKeys[key]) ? ' pv-merged' : '';
+    html += `<tr data-row class="${cls.trim()}">
+      <td><input type="text" class="pv-input pv-name" value="${escAttr(p.name)}" placeholder="自动编号"></td>
+      <td><input type="number" class="pv-input pv-w" value="${p.width}" min="1" step="1"></td>
+      <td><input type="number" class="pv-input pv-h" value="${p.height}" min="1" step="1"></td>
+      <td><input type="number" class="pv-input pv-q" value="${p.qty}" min="1" step="1"></td>
+      <td><button type="button" class="pv-del" onclick="deletePreviewRow(this)" title="删除此行">×</button></td>
+    </tr>`;
+  }
+  html += '</table>';
+  body.innerHTML = html;
+  note.textContent = noteText || '识别有误的可直接在表格中修改或删除，然后点「导入」';
+}
+
+/** 删除预览中的一行 */
+function deletePreviewRow(btn) {
+  const tr = btn.closest('tr[data-row]');
+  if (!tr) return;
+  tr.remove();
+  const list = readPreviewRows();
+  $('importPreviewCount').textContent = `（${list.length} 行）`;
+  const note = $('importPreviewNote');
+  note.textContent = list.length > 0 ? `已删除，剩余 ${list.length} 行。确认后点「导入」` : '已全部删除，可重新粘贴数据';
+  if (list.length === 0) {
+    $('importPreviewBody').innerHTML = '';
+  }
+}
+
+/** 更新弹窗内解析预览（默认逐行显示，不合并；相同零件按行保留） */
+function updateImportPreview() {
+  const text = $('importText').value;
+  const body = $('importPreviewBody');
+  const count = $('importPreviewCount');
+  const note = $('importPreviewNote');
+  const wrap = $('importPreview');
+  if (!text.trim()) { wrap.style.display = 'none'; return; }
+  const rows = parseImportText(text);
+  wrap.style.display = '';
+  if (rows.length === 0) {
+    count.textContent = '';
+    body.innerHTML = '<span class="warn">未识别到有效零件，请检查格式</span>';
+    note.textContent = '';
+    return;
+  }
+  renderPreviewTable(rows, `共 ${rows.length} 行，逐行导入。如需把相同名称+尺寸的合并数量，点「合并重复」`);
+}
+
+/** 合并预览表格中相同名称+尺寸的零件（数量相加），需要时手动触发 */
+function mergePreviewRows() {
+  const trs = document.querySelectorAll('#importPreviewBody table tr[data-row]');
+  if (trs.length === 0) return;
+  const merged = new Map();
+  const counts = new Map();
+  for (const tr of trs) {
+    const name = tr.querySelector('.pv-name').value.trim();
+    const width = parseFloat(tr.querySelector('.pv-w').value);
+    const height = parseFloat(tr.querySelector('.pv-h').value);
+    const qty = parseInt(tr.querySelector('.pv-q').value, 10) || 1;
+    const key = name + '|' + width + '|' + height;
+    if (merged.has(key)) merged.get(key).qty += qty;
+    else merged.set(key, { name, width, height, qty });
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const list = [...merged.values()];
+  const mergedKeys = {};
+  for (const [k, c] of counts) if (c > 1) mergedKeys[k] = true;
+  const mergedCount = Object.keys(mergedKeys).length;
+  renderPreviewTable(list, `已合并重复项：${trs.length} 行 → ${list.length} 行（其中 ${mergedCount} 行由重复项合并，橙色块标记）。可继续修改后点「导入」`, mergedKeys);
+}
+
+/** HTML 属性转义（防止名称含特殊字符破坏表格） */
+function escAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** 从可编辑预览表格读取用户确认后的零件（名称留空=自动编号） */
+function readPreviewRows() {
+  const rows = [];
+  const trs = document.querySelectorAll('#importPreviewBody table tr[data-row]');
+  for (const tr of trs) {
+    const name = tr.querySelector('.pv-name').value.trim();
+    const width = parseFloat(tr.querySelector('.pv-w').value);
+    const height = parseFloat(tr.querySelector('.pv-h').value);
+    const qty = parseInt(tr.querySelector('.pv-q').value, 10);
+    if (width > 0 && height > 0 && qty > 0) {
+      rows.push({ name, width, height, qty });
+    }
+  }
+  return rows;
+}
+
+/** 自动编号（接续当前自动编号零件最大序号） */
+function nextAutoName() {
+  let maxSeq = 0;
+  for (const p of state.parts) {
+    if (p.autoNamed) {
+      const n = parseInt(p.name, 10);
+      if (!isNaN(n) && n > maxSeq) maxSeq = n;
+    }
+  }
+  return String(maxSeq + 1);
+}
+
+/** 批量加入零件（按预览行逐条添加，不主动合并；同名同尺寸保留为多行） */
+function addImportedParts(rows) {
+  let totalQty = 0;
+  for (const r of rows) {
+    const name = r.name || nextAutoName();
+    state.parts.push({
+      id: state.nextPartId++,
+      name,
+      width: r.width,
+      height: r.height,
+      qty: r.qty,
+      rotatable: true,
+      autoNamed: !r.name,
+      color: generatePartColor(state.parts.length)
+    });
+    totalQty += r.qty;
+  }
+  renderPartsList();
+  showToast(`成功导入 ${rows.length} 种零件（合计 ${totalQty} 件）`, 'success');
+}
+
+function importFromText() {
+  // 优先读取可编辑预览表格（用户可能已手动修改），没有表格再重新解析文本
+  let rows;
+  const table = document.querySelector('#importPreviewBody table');
+  if (table) {
+    rows = readPreviewRows();
+  } else {
+    rows = parseImportText($('importText').value);
+  }
+  if (rows.length === 0) {
+    showToast('未识别到有效零件，请检查格式', 'error');
+    return;
+  }
+  closeImportModal();
+  addImportedParts(rows);
+}
+
+/** 处理选择的文件（CSV/TSV/TXT 直接读；XLSX/XLS 动态加载 SheetJS 解析） */
+function handleImportFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+
+  if (['csv', 'tsv', 'txt'].includes(ext)) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || '');
+      $('importText').value = text;
+      $('importFileName').textContent = `已读取 ${file.name}（${text.split(/\r?\n/).length} 行）`;
+      switchImportTab('paste');
+      updateImportPreview();
+      const preview = parseImportText(text);
+      if (preview.length > 0) {
+        showToast(`识别到 ${preview.length} 行零件数据，请看下方预览确认`, 'success');
+      } else {
+        showToast('未识别到有效数据，请检查格式', 'error');
+      }
+    };
+    reader.onerror = () => showToast('读取文件失败', 'error');
+    reader.readAsText(file, 'utf-8');
+  } else if (['xlsx', 'xls'].includes(ext)) {
+    loadXLSX().then(XLSX => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const wb = XLSX.read(new Uint8Array(reader.result), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          const text = json.map(row => row.map(c => String(c).trim()).filter(Boolean).join('\t')).join('\n');
+          $('importText').value = text;
+          $('importFileName').textContent = `已读取 ${file.name}（${json.length} 行）`;
+          switchImportTab('paste');
+          updateImportPreview();
+          const preview = parseImportText(text);
+          showToast(preview.length > 0 ? `识别到 ${preview.length} 行零件数据，请看下方预览确认` : '未识别到有效数据，请检查格式', preview.length > 0 ? 'success' : 'error');
+        } catch (e) {
+          showToast('解析 Excel 失败，请先用 Excel 另存为 CSV 再导入', 'error');
+        }
+      };
+      reader.onerror = () => showToast('读取文件失败', 'error');
+      reader.readAsArrayBuffer(file);
+    }).catch(() => {
+      showToast('Excel 解析库加载失败（需联网）。请先用 Excel 另存为 CSV 再导入', 'error');
+      $('importFileInput').value = '';
+    });
+  } else {
+    showToast('不支持的文件类型，请选择 CSV 或 Excel', 'error');
+    $('importFileInput').value = '';
+  }
+}
+
+/** 动态加载 SheetJS（仅 .xlsx/.xls 需要，加载一次后缓存） */
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload = () => resolve(window.XLSX);
+    s.onerror = () => reject(new Error('load fail'));
+    document.head.appendChild(s);
+  });
+}
+
+// ========== 图片尺寸识别 ==========
+
+/** 动态加载 Tesseract.js（浏览器端 OCR，加载一次后缓存） */
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = () => resolve(window.Tesseract);
+    s.onerror = () => reject(new Error('Tesseract 加载失败（需联网）'));
+    document.head.appendChild(s);
+  });
+}
+
+/** 打开弹窗时重置图片识别区 */
+function resetImageImport() {
+  $('importImageInput').value = '';
+  $('importImageName').textContent = '未选择图片（支持 JPG / PNG / 截图 / 照片）';
+  $('ocrImageWrap').style.display = 'none';
+  $('ocrImageHint').style.display = 'none';
+  $('ocrImage').removeAttribute('src');
+  $('ocrActions').style.display = 'none';
+  closeOcrLightbox();
+  clearOcrResult();
+}
+
+/** 选择图片并显示 */
+function handleImportImage(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { showToast('请选择图片文件', 'error'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = $('ocrImage');
+    img.onload = () => {
+      $('ocrImageWrap').style.display = '';
+      $('ocrImageHint').style.display = '';
+      $('ocrActions').style.display = '';
+      $('ocrStatus').style.display = 'none';
+      clearOcrResult();
+    };
+    img.src = reader.result;
+    $('importImageName').textContent = `已选择 ${file.name}（${(file.size / 1024).toFixed(0)} KB）`;
+  };
+  reader.onerror = () => showToast('读取图片失败', 'error');
+  reader.readAsDataURL(file);
+}
+
+/** 打开原图放大灯箱（显示原分辨率图片，供核对尺寸；下方同步展示识别结果，不挡统计） */
+function openOcrLightbox() {
+  const img = $('ocrImage');
+  if (!img || !img.src) return;
+  $('ocrLbImg').src = img.src;
+  $('ocrLbImg').classList.remove('lb-raw');
+  renderLbEditable();
+  const lb = $('ocrLightbox');
+  lb.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeOcrLightbox() {
+  // 关闭前把灯箱内编辑结果强制写回弹窗预览，保证数据不丢
+  const box = $('ocrLbSummary');
+  if (box && box.querySelector('tr[data-i]')) {
+    const rows = readLbRows();
+    if (rows.length) {
+      renderPreviewTable(rows, '已在灯箱中修改，回到弹窗可直接点「导入」');
+      $('importPreview').style.display = '';
+    }
+  }
+  $('ocrLightbox').style.display = 'none';
+  $('ocrLbImg').src = '';
+  document.body.style.overflow = '';
+}
+/** 灯箱内点击图片：适应窗口 ↔ 原始大小（原始大小可滚动查看细节） */
+function toggleOcrLbZoom() {
+  const el = $('ocrLbImg');
+  el.classList.toggle('lb-raw');
+  const wrap = document.querySelector('.ocr-lb-imgwrap');
+  if (wrap) { wrap.scrollTop = 0; wrap.scrollLeft = 0; }
+}
+/** 灯箱底部显示可编辑的识别结果表格（修改后关闭即保存） */
+function renderLbEditable() {
+  const box = $('ocrLbSummary');
+  if (!box) return;
+  const preview = $('importPreview');
+  const rows = (preview && preview.style.display !== 'none') ? readPreviewRows() : [];
+  if (!rows.length) { box.innerHTML = '<div class="lb-empty">尚无识别结果。先关闭灯箱，点「开始识别尺寸」后再放大核对。</div>'; return; }
+  let h = `<div class="lb-title">识别结果（共 ${rows.length} 行，可直接修改）</div><table><tr><th>名称</th><th>长(mm)</th><th>宽(mm)</th><th>数量</th></tr>`;
+  rows.forEach((p, i) => {
+    h += `<tr data-i="${i}">
+      <td><input class="lb-input lb-name" value="${escAttr(p.name || '')}" placeholder="自动编号"></td>
+      <td><input type="number" class="lb-input lb-w" value="${p.width}" min="1" step="1"></td>
+      <td><input type="number" class="lb-input lb-h" value="${p.height}" min="1" step="1"></td>
+      <td><input type="number" class="lb-input lb-q" value="${p.qty}" min="1" step="1"></td>
+    </tr>`;
+  });
+  h += '</table>';
+  box.innerHTML = h;
+}
+/** 读取灯箱内可编辑表格的数据 */
+function readLbRows() {
+  const rows = [];
+  const box = $('ocrLbSummary');
+  if (!box) return rows;
+  box.querySelectorAll('tr[data-i]').forEach(tr => {
+    const name = tr.querySelector('.lb-name').value.trim();
+    const width = parseFloat(tr.querySelector('.lb-w').value);
+    const height = parseFloat(tr.querySelector('.lb-h').value);
+    const qty = parseInt(tr.querySelector('.lb-q').value, 10) || 1;
+    if (width > 0 && height > 0 && qty > 0) rows.push({ name, width, height, qty });
+  });
+  return rows;
+}
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/** 清除图片识别结果（识别框 / 预览 / 状态） */
+function clearOcrResult() {
+  const wrap = $('ocrImageWrap');
+  const canvas = wrap ? wrap.querySelector('canvas') : null;
+  if (canvas) canvas.remove();
+  $('ocrRunBtn').disabled = false;
+  $('ocrRunBtn').textContent = '开始识别尺寸';
+  $('ocrClearBtn').style.display = 'none';
+  $('ocrStatus').style.display = 'none';
+  $('importPreview').style.display = 'none';
+  $('importPreviewBody').innerHTML = '';
+  $('importPreviewCount').textContent = '';
+  $('importPreviewNote').textContent = '';
+}
+
+/** 把 OCR 识别到的词按行聚类 → 文本行列表（用于复用表格/单行解析） */
+function ocrWordsToLines(words) {
+  const sorted = [...words].sort((a, b) => (a.bbox.y0 + a.bbox.y1) - (b.bbox.y0 + b.bbox.y1));
+  const groups = [];
+  let cur = [], curY = null;
+  for (const w of sorted) {
+    const cy = (w.bbox.y0 + w.bbox.y1) / 2;
+    const h = Math.max(6, w.bbox.y1 - w.bbox.y0);
+    if (curY === null || Math.abs(cy - curY) <= h) {
+      cur.push(w);
+      if (curY === null) curY = cy;
+    } else {
+      if (cur.length) groups.push(cur);
+      cur = [w];
+      curY = cy;
+    }
+  }
+  if (cur.length) groups.push(cur);
+  return groups
+    .map(g => g.sort((a, b) => a.bbox.x0 - b.bbox.x0).map(w => w.text.trim()).filter(Boolean).join(' '))
+    .filter(t => /\d/.test(t));
+}
+
+// ---------- OCR 表格专用解析（按 x 坐标对齐列，容忍丢字/错位） ----------
+
+/** 按 y 把词聚成行（返回行数组，每行为词数组） */
+function groupWordsByLine(words) {
+  const sorted = [...words].sort((a, b) => (a.bbox.y0 + a.bbox.y1) - (b.bbox.y0 + b.bbox.y1));
+  const lines = [];
+  let cur = [], curY = null;
+  for (const w of sorted) {
+    const cy = (w.bbox.y0 + w.bbox.y1) / 2;
+    const h = Math.max(6, w.bbox.y1 - w.bbox.y0);
+    if (curY === null || Math.abs(cy - curY) <= h) {
+      cur.push(w);
+      if (curY === null) curY = cy;
+    } else {
+      if (cur.length) lines.push(cur);
+      cur = [w];
+      curY = cy;
+    }
+  }
+  if (cur.length) lines.push(cur);
+  return lines;
+}
+
+/** 收集全局列中心 x（按接近聚类） */
+function collectColCenters(lines) {
+  const xs = [];
+  for (const line of lines) for (const w of line) xs.push((w.bbox.x0 + w.bbox.x1) / 2);
+  xs.sort((a, b) => a - b);
+  const centers = [];
+  for (const x of xs) {
+    if (centers.length === 0 || x - centers[centers.length - 1] > 40) centers.push(x);
+  }
+  return centers;
+}
+
+function nearestCol(x, centers) {
+  let bi = 0, bd = Infinity;
+  for (let i = 0; i < centers.length; i++) {
+    const d = Math.abs(x - centers[i]);
+    if (d < bd) { bd = d; bi = i; }
+  }
+  return bi;
+}
+
+/** 把词按列中心归位成二维单元格 [行][列] */
+function wordsToCells(lines, centers) {
+  return lines.map(rowWords => {
+    const rowCells = new Array(centers.length).fill('');
+    for (const w of rowWords) {
+      const ci = nearestCol((w.bbox.x0 + w.bbox.x1) / 2, centers);
+      rowCells[ci] = (rowCells[ci] ? rowCells[ci] + ' ' : '') + w.text;
+    }
+    return rowCells;
+  });
+}
+
+/**
+ * OCR 表格解析：适用于多行多列的表格截图（如 Excel 表格截图）。
+ * 按 x 坐标对齐列（容忍某行丢字导致的错位），再按列语义识别：
+ * 序号列（递增）→ 跳过；厚度/状态列（取值种类少且值小）→ 跳过；
+ * 剩余列按均值排序：最大=宽、次大=高、最小=数量。
+ * 非表格（标注图）返回 null，由调用方退回常规解析。
+ */
+function parseOcrTable(words) {
+  const numWords = words.filter(w => /\d/.test(w.text));
+  if (numWords.length < 8) return null;
+  const lines = groupWordsByLine(numWords);
+  if (lines.length < 2) return null;
+  const centers = collectColCenters(lines);
+  if (centers.length < 3) return null;
+  const cells = wordsToCells(lines, centers);
+  if (cells.length < 2) return null;
+
+  const colStats = centers.map((_, ci) => {
+    const vals = [];
+    for (const row of cells) {
+      const v = firstNum(row[ci] || '');
+      if (v > 0) vals.push(v);
+    }
+    if (vals.length < 2) return { ci, empty: true };
+    let increasing = true;
+    for (let i = 1; i < vals.length; i++) if (vals[i] !== vals[i - 1] + 1) { increasing = false; break; }
+    const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+    const max = Math.max(...vals);
+    const uniqueCount = new Set(vals).size;
+    return { ci, empty: false, increasing, avg, max, uniqueCount };
+  });
+
+  let sem = colStats.filter(c => !c.empty);
+  sem = sem.filter(c => !c.increasing);                      // 排除序号列
+  sem = sem.filter(c => !(c.uniqueCount <= 3 && c.max <= 40)); // 排除厚度/状态列
+  sem.sort((a, b) => b.avg - a.avg);
+
+  const parts = [];
+  if (sem.length >= 3) {
+    const wc = sem[0].ci, hc = sem[1].ci, qc = sem[2].ci;
+    for (const row of cells) {
+      const width = firstNum(row[wc] || '');
+      const height = firstNum(row[hc] || '');
+      const qty = Math.round(firstNum(row[qc] || ''));
+      if (width >= 10 && height >= 10 && qty > 0) parts.push({ name: '', width, height, qty });
+    }
+  } else if (sem.length === 2) {
+    const wc = sem[0].ci, hc = sem[1].ci;
+    for (const row of cells) {
+      const width = firstNum(row[wc] || '');
+      const height = firstNum(row[hc] || '');
+      if (width >= 10 && height >= 10) parts.push({ name: '', width, height, qty: 1 });
+    }
+  }
+  return parts.length > 0 ? parts : null;
+}
+
+/**
+ * OCR 标注图解析：针对"数量词 + 少量尺寸数字"的简单标注图（如"共4张大板制作"旁标 1910 高、1187 宽）。
+ * 规则：找数量词（X片/X张/共X张）；尺寸候选为 ≥10 且 ≤6000 的数字；
+ * 出现重复的值为一条边（如等分宽 1187×4），另一不同值为另一条边，配对成长×宽×数量。
+ * 数字过多 / 无法形成配对时返回 null（交由通用解析或提示人工核对）。
+ */
+function parseOcrAnnots(words) {
+  const numWords = words.filter(w => /\d/.test(w.text));
+  if (numWords.length === 0 || numWords.length > 14) return null;
+  const textRows = ocrWordsToLines(words);
+  // 数量词："X片/X张/X块/共X张/×X片"
+  let qty = 0;
+  for (const t of textRows) {
+    const m = t.match(/(?:共|约|×|x|X|\*)?\s*(\d+)\s*(?:片|张|块|件)/);
+    if (m) { const q = parseInt(m[1], 10); if (q > qty) qty = q; }
+  }
+
+  const dims = [];
+  for (const w of numWords) {
+    const n = parseFloat((w.text || '').replace(/[^\d.]/g, ''));
+    if (n >= 10 && n <= 6000) dims.push(n);
+  }
+  if (dims.length === 0) return null;
+
+  const counts = {};
+  for (const d of dims) counts[d] = (counts[d] || 0) + 1;
+  const entries = Object.entries(counts).map(([k, v]) => [parseFloat(k), v]).sort((a, b) => b[1] - a[1]);
+
+  // 数量词兜底：OCR 常把"共4张大板制作"识别成孤立数字"4"。
+  // 若尺寸中有重复值（等分/多块）且存在 1~9 的小数字，把它当作数量。
+  if (qty <= 0) {
+    const hasRepeat = entries.some(e => e[1] >= 2);
+    if (hasRepeat) {
+      const small = [];
+      for (const w of numWords) {
+        const n = parseFloat((w.text || '').replace(/[^\d.]/g, ''));
+        if (n >= 1 && n <= 9) small.push(n);
+      }
+      if (small.length > 0) qty = Math.max(...small);
+    }
+  }
+  if (qty <= 0 || qty > 1000) return null;
+
+  let width = 0, height = 0;
+  const top = entries[0];
+  const rest = entries.filter(e => e[0] !== top[0]);
+  if (top[1] >= 2 && rest.length >= 1) {
+    // 重复值=一条边（等分/多块），另一不同值=另一条边
+    width = Math.max(top[0], rest[0][0]);
+    height = Math.min(top[0], rest[0][0]);
+  } else if (entries.length === 2) {
+    // 恰好两个不同尺寸：长×宽
+    width = Math.max(entries[0][0], entries[1][0]);
+    height = Math.min(entries[0][0], entries[1][0]);
+  } else if (entries.length === 1) {
+    width = height = entries[0][0];
+  }
+  if (width >= 10 && height >= 10 && qty > 0) {
+    return [{ name: '', width, height, qty }];
+  }
+  return null;
+}
+
+/** 在图片上叠加识别框：红框=数字位置，橙框=置信度低需核对 */
+function drawOcrBoxes(words) {
+  const wrap = $('ocrImageWrap');
+  const img = $('ocrImage');
+  if (!wrap || !img || !img.naturalWidth) return;
+  let canvas = wrap.querySelector('canvas');
+  if (!canvas) { canvas = document.createElement('canvas'); wrap.appendChild(canvas); }
+  const iw = img.clientWidth || img.naturalWidth;
+  const ih = img.clientHeight || img.naturalHeight;
+  canvas.width = iw; canvas.height = ih;
+  canvas.style.width = iw + 'px'; canvas.style.height = ih + 'px';
+  const ctx = canvas.getContext('2d');
+  const sx = iw / img.naturalWidth;
+  const sy = ih / img.naturalHeight;
+  ctx.clearRect(0, 0, iw, ih);
+  for (const w of words) {
+    const b = w.bbox;
+    const x = b.x0 * sx, y = b.y0 * sy, wpx = (b.x1 - b.x0) * sx, hpx = (b.y1 - b.y0) * sy;
+    const low = w.confidence < 60;
+    ctx.strokeStyle = low ? '#e87722' : '#d64545';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x, y, wpx, hpx);
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = low ? '#e87722' : '#d64545';
+    ctx.fillText(w.text, x, Math.max(8, y - 4));
+  }
+}
+
+/** 执行图片 OCR：识别数字 → 图上叠加位置框 → 解析成零件预览 */
+/** OCR worker（复用）：createWorker 方式比 Tesseract.recognize 快捷方式识别率高很多（表格/小字场景差异极大），故单独封装 */
+let ocrWorkerPromise = null;
+function getOcrWorker() {
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = loadTesseract().then(() =>
+      Tesseract.createWorker('chi_sim', 1, {
+        logger: m => {
+          const status = $('ocrStatus');
+          if (status && m.status === 'recognizing text') status.textContent = `正在识别… ${Math.round((m.progress || 0) * 100)}%`;
+        }
+      }).then(w => w.setParameters({ tessedit_pageseg_mode: '3' }).then(() => w))
+    ).catch(err => { ocrWorkerPromise = null; throw err; });
+  }
+  return ocrWorkerPromise;
+}
+
+/**
+ * OCR 图片预处理：把彩色标注（CAD 尺寸数字常为青/蓝色）转成黑色前景、背景转白，并适当放大。
+ * 传统 OCR 假设"黑字白底"，彩色数字会被当背景滤掉，此处理可显著提升 CAD 标注图识别率。
+ * 返回 { canvas, scale }。
+ */
+function preprocessForOCR(img) {
+  const scale = img.naturalWidth < 1600 ? 2 : 1;
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth * scale;
+  c.height = img.naturalHeight * scale;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  try {
+    const id = ctx.getImageData(0, 0, c.width, c.height);
+    const d = id.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      const sat = mx - mn, lum = (r + g + b) / 3;
+      if (sat > 40 && lum > 70) { d[i] = d[i + 1] = d[i + 2] = 0; }      // 彩色像素（线条/标注数字）→ 黑
+      else if (lum < 128) { d[i] = d[i + 1] = d[i + 2] = 0; }            // 深色像素 → 黑
+      else { d[i] = d[i + 1] = d[i + 2] = 255; }                        // 背景 → 白
+    }
+    ctx.putImageData(id, 0, 0);
+  } catch (e) { /* 大图 getImageData 失败时退回原图 */ }
+  return { canvas: c, scale };
+}
+
+function runImageOcr() {
+  const img = $('ocrImage');
+  if (!img || !img.src) { showToast('请先选择图片', 'error'); return; }
+  const status = $('ocrStatus');
+  const btn = $('ocrRunBtn');
+  btn.disabled = true;
+  btn.textContent = '识别中…';
+  status.style.display = '';
+  status.textContent = '正在加载识别引擎（首次需联网下载，约 10~30 秒，请耐心等待）…';
+  getOcrWorker().then(async worker => {
+    status.textContent = '正在预处理图片（颜色增强）…';
+    const prep = preprocessForOCR(img);
+    status.textContent = '正在识别图片中的文字和尺寸…';
+    // PSM 自适应：稀疏标注图(11) 与 整页/表格(3) 各跑一次，按位置合并识别结果（两模式互补，避免漏字）
+    const datas = [];
+    for (const psm of ['11', '3']) {
+      await worker.setParameters({ tessedit_pageseg_mode: psm });
+      const r = await worker.recognize(prep.canvas);
+      datas.push(r.data);
+    }
+    // 合并 words（文本+粗略位置去重），还原坐标到原图
+    const merged = new Map();
+    for (const data of datas) {
+      for (const w of (data.words || [])) {
+        if (!/\d/.test(w.text)) continue;
+        const b = w.bbox;
+        const key = `${w.text}|${Math.round(b.x0 / 10)}|${Math.round(b.y0 / 10)}`;
+        if (!merged.has(key)) merged.set(key, w);
+      }
+    }
+    const words = [...merged.values()].map(w => {
+      const b = w.bbox;
+      return { ...w, bbox: { x0: b.x0 / prep.scale, x1: b.x1 / prep.scale, y0: b.y0 / prep.scale, y1: b.y1 / prep.scale } };
+    });
+    return { words };
+  }).then(({ words }) => {
+    drawOcrBoxes(words);
+    // 解析链：表格截图 → 标注图（数量词+尺寸） → 通用单行解析
+    const tableRows = parseOcrTable(words);
+    const annotRows = tableRows ? null : parseOcrAnnots(words);
+    const rows = tableRows || annotRows || parseImportText(ocrWordsToLines(words).join('\n'));
+    status.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '重新识别';
+    $('ocrClearBtn').style.display = '';
+    $('importPreview').style.display = '';
+    if (rows.length > 0) {
+      const low = words.filter(w => w.confidence < 60);
+      let note = `识别到 ${rows.length} 行零件。图上红框=识别到的数字位置，橙框=置信度低需重点核对。请对照原图确认尺寸与板材对应后，可在下方修改 / 删除再导入。`;
+      if (low.length > 0) note += `<br>低置信度数字：<span class="ocr-conf-low">${low.slice(0, 8).map(w => `${w.text}(${Math.round(w.confidence)}%)`).join('、')}</span>`;
+      renderPreviewTable(rows, note);
+    } else {
+      $('importPreviewBody').innerHTML = '<span class="warn">未识别到有效尺寸数字。请确认图片清晰、尺寸标注明显，或改用其他导入方式</span>';
+      $('importPreviewCount').textContent = '';
+      $('importPreviewNote').textContent = '';
+    }
+  }).catch(err => {
+    status.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '开始识别尺寸';
+    showToast('识别失败：' + (err && err.message ? err.message : '请检查网络后重试'), 'error');
+  });
+}
+
+// 对自动编号的零件按当前列表顺序重新命名（1、2、3…），手动命名的不受影响
+function renumberAutoParts() {
+  let seq = 1;
+  for (const p of state.parts) {
+    if (p.autoNamed) {
+      p.name = String(seq);
+    }
+    seq++;
+  }
+}
+
+function removePart(id) {
+  state.parts = state.parts.filter(p => p.id !== id);
+  if (state.editingId === id) state.editingId = null;
+  if (state.editingQtyId === id) state.editingQtyId = null;
+  renumberAutoParts();
+  renderPartsList();
+}
+
+// 开始编辑零件名称
+function startEditPartName(id) {
+  state.editingId = id;
+  renderPartsList();
+  // 渲染后聚焦输入框并全选
+  setTimeout(() => {
+    const input = $('editNameInput_' + id);
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }, 0);
+}
+
+// 保存零件名称
+function savePartName(id) {
+  const input = $('editNameInput_' + id);
+  const part = state.parts.find(p => p.id === id);
+  if (!part) { state.editingId = null; return; }
+
+  let newName = input ? input.value.trim() : part.name;
+  if (newName) {
+    part.name = newName;
+    part.autoNamed = false; // 手动修改过名称后，不再参与自动重排
+  }
+  // 如果清空了名称，恢复为自动编号
+  if (!newName) {
+    part.autoNamed = true;
+    renumberAutoParts();
+  }
+
+  state.editingId = null;
+  renderPartsList();
+}
+
+// 编辑名称时的键盘事件：回车保存，Esc 取消
+function onEditNameKeydown(event, id) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    savePartName(id);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    state.editingId = null;
+    renderPartsList();
+  }
+}
+
+function editPartQty(id, delta) {
+  const part = state.parts.find(p => p.id === id);
+  if (!part) return;
+  part.qty = Math.max(1, part.qty + delta);
+  renderPartsList();
+}
+
+// 开始编辑零件数量
+function startEditPartQty(id) {
+  state.editingQtyId = id;
+  renderPartsList();
+  setTimeout(() => {
+    const input = $('editQtyInput_' + id);
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }, 0);
+}
+
+// 保存零件数量
+function savePartQty(id) {
+  const input = $('editQtyInput_' + id);
+  const part = state.parts.find(p => p.id === id);
+  if (!part) { state.editingQtyId = null; return; }
+
+  if (input) {
+    const val = parseInt(input.value, 10);
+    if (!isNaN(val) && val >= 1) {
+      part.qty = val;
+    }
+  }
+  state.editingQtyId = null;
+  renderPartsList();
+}
+
+// 编辑数量时的键盘事件：回车保存，Esc 取消
+function onEditQtyKeydown(event, id) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    savePartQty(id);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    state.editingQtyId = null;
+    renderPartsList();
+  }
+}
+
+function renderPartsList() {
+  const container = $('partsList');
+  $('partsCount').textContent = '(' + state.parts.length + ' 种)';
+
+  if (state.parts.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </div>
+        <div class="empty-state-text">暂无零件，请在下方添加</div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = state.parts.map(p => {
+    const isEditing = state.editingId === p.id;
+    const isEditingQty = state.editingQtyId === p.id;
+    const textured = $('sheetType') && $('sheetType').value === 'textured';
+    return `
+    <div class="part-item">
+      <div class="part-color" style="background:${p.color}"></div>
+      <div class="part-info">
+        ${isEditing
+          ? `<input type="text" class="part-name-input" id="editNameInput_${p.id}" value="${escapeHtml(p.name)}"
+              onkeydown="onEditNameKeydown(event, ${p.id})" onblur="savePartName(${p.id})">`
+          : `<div class="part-name" ondblclick="startEditPartName(${p.id})" title="双击修改名称">${escapeHtml(p.name)}</div>`
+        }
+        <div class="part-dims">${p.width} × ${p.height} mm ${textured ? '· 方向一致' : (p.rotatable ? '· 可旋转' : '· 不可旋转')}</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:4px;">
+        ${isEditingQty ? '' : `<button class="icon-btn" onclick="editPartQty(${p.id}, -1)" title="减少数量">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>`}
+        ${isEditingQty
+          ? `<input type="number" class="part-qty-input" id="editQtyInput_${p.id}" value="${p.qty}" min="1" step="1"
+              onkeydown="onEditQtyKeydown(event, ${p.id})" onblur="savePartQty(${p.id})">`
+          : `<span class="part-qty" onclick="startEditPartQty(${p.id})" title="点击修改数量">${p.qty}</span>`
+        }
+        ${isEditingQty ? '' : `<button class="icon-btn" onclick="editPartQty(${p.id}, 1)" title="增加数量">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>`}
+      </div>
+      <div class="part-actions">
+        ${isEditing ? '' : `<button class="icon-btn" onclick="startEditPartName(${p.id})" title="修改名称">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>`}
+        <button class="icon-btn danger" onclick="removePart(${p.id})" title="删除">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>
+    </div>
+  `}).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ========== 核心排版算法 ==========
+
+/**
+ * Max Rectangles 2D 装箱算法
+ * @param {Array} parts - 零件列表 [{id, name, width, height, rotatable, color}]
+ * @param {number} sheetW - 板材宽度
+ * @param {number} sheetH - 板材高度
+ * @param {number} kerf - 锯缝宽度
+ * @param {string} heuristic - 启发式: BSSF, BLSF, BAF, BL
+ * @returns {Object} 排版结果
+ */
+function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
+  // 展开零件（每个数量单独一个实例）
+  let items = [];
+  parts.forEach(p => {
+    for (let i = 0; i < p.qty; i++) {
+      items.push({
+        partId: p.id,
+        name: p.name,
+        width: p.width,
+        height: p.height,
+        rotatable: p.rotatable,
+        color: p.color,
+        instance: i + 1
+      });
+    }
+  });
+
+  // 多种排序维度，auto 模式下组合使用以探索更优解
+  const sortFns = {
+    area: (a, b) => (b.width * b.height) - (a.width * a.height),
+    longSide: (a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height),
+    width: (a, b) => b.width - a.width,
+    height: (a, b) => b.height - a.height,
+    perimeter: (a, b) => (b.width + b.height) - (a.width + a.height)
+  };
+  items.sort(sortFns[sortMode] || sortFns.area);
+
+  const sheets = []; // 每张板的放置结果
+  const freeRects = []; // 每张板的空闲矩形列表
+
+  function newSheet() {
+    sheets.push([]);
+    freeRects.push([{ x: 0, y: 0, w: sheetW, h: sheetH }]);
+    return sheets.length - 1;
+  }
+
+  // 尝试在指定板材中放置一个零件
+  function placeInSheet(sheetIdx, item) {
+    const frees = freeRects[sheetIdx];
+    const orientations = item.rotatable
+      ? [[item.width, item.height, false], [item.height, item.width, true]]
+      : [[item.width, item.height, false]];
+
+    // ===== 紧凑聚边策略 (COM)：模拟放置，评估剩余空闲空间的聚合度 =====
+    // 目标：零件尽量靠角落聚拢，剩余空间尽量保持为一块完整的大矩形，
+    //       碎片数量最少（避免异形余料）
+    if (heuristic === 'COM') {
+      let bestPick = null;
+
+      for (const [w, h, rotated] of orientations) {
+        for (let fi = 0; fi < frees.length; fi++) {
+          const fr = frees[fi];
+          if (w > fr.w || h > fr.h) continue;
+
+          // 模拟：分割该空闲矩形，再与其余空闲矩形合并
+          const simulated = [];
+          for (let i = 0; i < frees.length; i++) {
+            if (i === fi) {
+              const r1 = { x: fr.x + w, y: fr.y, w: fr.w - w, h: h };
+              const r2 = { x: fr.x, y: fr.y + h, w: fr.w, h: fr.h - h };
+              if (r1.w > 0 && r1.h > 0) simulated.push(r1);
+              if (r2.w > 0 && r2.h > 0) simulated.push(r2);
+            } else {
+              simulated.push(frees[i]);
+            }
+          }
+          const merged = mergeFreeRects(simulated);
+
+          // 评估指标：放置后最大连续空闲矩形面积（含贴边奖励）、碎片数量、靠角程度
+          let maxFreeArea = 0;
+          let maxFreeEdge = 0;
+          for (const mf of merged) {
+            const area = mf.w * mf.h;
+            if (area > maxFreeArea) {
+              maxFreeArea = area;
+              let edges = 0;
+              if (mf.x <= 0.5) edges++;
+              if (mf.y <= 0.5) edges++;
+              if (Math.abs(mf.x + mf.w - sheetW) <= 0.5) edges++;
+              if (Math.abs(mf.y + mf.h - sheetH) <= 0.5) edges++;
+              maxFreeEdge = edges;
+            }
+          }
+          // 贴边的余料更容易整块再利用（可继续切割长条/大件），给予奖励
+          const compactScore = maxFreeArea * (1 + 0.12 * maxFreeEdge);
+
+          const pick = {
+            compactScore,
+            maxFreeArea,
+            fragmentCount: merged.length,
+            corner: fr.x + fr.y,
+            fr, rotated, x: fr.x, y: fr.y, w, h
+          };
+
+          if (!bestPick ||
+              pick.compactScore > bestPick.compactScore ||
+              (pick.compactScore === bestPick.compactScore && pick.fragmentCount < bestPick.fragmentCount) ||
+              (pick.compactScore === bestPick.compactScore && pick.fragmentCount === bestPick.fragmentCount && pick.corner < bestPick.corner)) {
+            bestPick = pick;
+          }
+        }
+      }
+
+      if (!bestPick) return false;
+
+      // 执行放置
+      const placement = {
+        x: bestPick.x,
+        y: bestPick.y,
+        w: bestPick.w,
+        h: bestPick.h,
+        partId: item.partId,
+        name: item.name,
+        color: item.color,
+        rotated: bestPick.rotated,
+        instance: item.instance,
+        originalW: item.width,
+        originalH: item.height
+      };
+      sheets[sheetIdx].push(placement);
+
+      // 分割 + 合并空闲矩形
+      const newFrees = [];
+      for (const fr of frees) {
+        if (bestPick.x + bestPick.w <= fr.x || bestPick.x >= fr.x + fr.w ||
+            bestPick.y + bestPick.h <= fr.y || bestPick.y >= fr.y + fr.h) {
+          newFrees.push(fr);
+          continue;
+        }
+        if (bestPick.y > fr.y) {
+          newFrees.push({ x: fr.x, y: fr.y, w: fr.w, h: bestPick.y - fr.y });
+        }
+        if (bestPick.y + bestPick.h < fr.y + fr.h) {
+          newFrees.push({ x: fr.x, y: bestPick.y + bestPick.h, w: fr.w, h: fr.y + fr.h - (bestPick.y + bestPick.h) });
+        }
+        if (bestPick.x > fr.x) {
+          newFrees.push({ x: fr.x, y: Math.max(fr.y, bestPick.y), w: bestPick.x - fr.x, h: Math.min(fr.y + fr.h, bestPick.y + bestPick.h) - Math.max(fr.y, bestPick.y) });
+        }
+        if (bestPick.x + bestPick.w < fr.x + fr.w) {
+          newFrees.push({ x: bestPick.x + bestPick.w, y: Math.max(fr.y, bestPick.y), w: fr.x + fr.w - (bestPick.x + bestPick.w), h: Math.min(fr.y + fr.h, bestPick.y + bestPick.h) - Math.max(fr.y, bestPick.y) });
+        }
+      }
+      freeRects[sheetIdx] = mergeFreeRects(newFrees);
+      return true;
+    }
+
+    // ===== 传统启发式 (BSSF / BLSF / BAF / BL) =====
+    let bestScore = Infinity;
+    let bestFree = null;
+    let bestRotated = false;
+    let bestX = 0, bestY = 0;
+    let bestW = 0, bestH = 0;
+
+    for (const [w, h, rotated] of orientations) {
+      for (const fr of frees) {
+        if (w <= fr.w && h <= fr.h) {
+          let score;
+          const leftoverW = fr.w - w;
+          const leftoverH = fr.h - h;
+
+          switch (heuristic) {
+            case 'BSSF': // Best Short Side Fit
+              score = Math.min(leftoverW, leftoverH);
+              break;
+            case 'BLSF': // Best Long Side Fit
+              score = Math.max(leftoverW, leftoverH);
+              break;
+            case 'BAF': // Best Area Fit
+              score = fr.w * fr.h - w * h;
+              break;
+            case 'BL': // Bottom Left
+              score = fr.y * 100000 + fr.x;
+              break;
+            default:
+              score = Math.min(leftoverW, leftoverH);
+          }
+
+          if (score < bestScore) {
+            bestScore = score;
+            bestFree = fr;
+            bestRotated = rotated;
+            bestX = fr.x;
+            bestY = fr.y;
+            bestW = w;
+            bestH = h;
+          }
+        }
+      }
+    }
+
+    if (!bestFree) return false;
+
+    // 放置零件
+    const placement = {
+      x: bestX,
+      y: bestY,
+      w: bestW,
+      h: bestH,
+      partId: item.partId,
+      name: item.name,
+      color: item.color,
+      rotated: bestRotated,
+      instance: item.instance,
+      originalW: item.width,
+      originalH: item.height
+    };
+    sheets[sheetIdx].push(placement);
+
+    // 分割空闲矩形：从被占用的矩形中生成右方和上方的空闲区域
+    const newFrees = [];
+    for (const fr of frees) {
+      // 如果完全不相交，保留
+      if (bestX + bestW <= fr.x || bestX >= fr.x + fr.w ||
+          bestY + bestH <= fr.y || bestY >= fr.y + fr.h) {
+        newFrees.push(fr);
+        continue;
+      }
+
+      // 上方区域
+      if (bestY > fr.y) {
+        newFrees.push({ x: fr.x, y: fr.y, w: fr.w, h: bestY - fr.y });
+      }
+      // 下方区域
+      if (bestY + bestH < fr.y + fr.h) {
+        newFrees.push({ x: fr.x, y: bestY + bestH, w: fr.w, h: fr.y + fr.h - (bestY + bestH) });
+      }
+      // 左方区域
+      if (bestX > fr.x) {
+        newFrees.push({ x: fr.x, y: Math.max(fr.y, bestY), w: bestX - fr.x, h: Math.min(fr.y + fr.h, bestY + bestH) - Math.max(fr.y, bestY) });
+      }
+      // 右方区域
+      if (bestX + bestW < fr.x + fr.w) {
+        newFrees.push({ x: bestX + bestW, y: Math.max(fr.y, bestY), w: fr.x + fr.w - (bestX + bestW), h: Math.min(fr.y + fr.h, bestY + bestH) - Math.max(fr.y, bestY) });
+      }
+    }
+
+    // 合并相邻空闲矩形，减少碎片、让余料更规整
+    freeRects[sheetIdx] = mergeFreeRects(newFrees);
+    return true;
+  }
+
+  // 清理空闲矩形：移除被其他矩形完全包含的、面积为0的
+  function pruneFreeRects(frees) {
+    const result = [];
+    for (let i = 0; i < frees.length; i++) {
+      const a = frees[i];
+      if (a.w <= 0 || a.h <= 0) continue;
+      let contained = false;
+      for (let j = 0; j < frees.length; j++) {
+        if (i === j) continue;
+        const b = frees[j];
+        if (b.w <= 0 || b.h <= 0) continue;
+        // a 被 b 完全包含
+        if (a.x >= b.x && a.y >= b.y &&
+            a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h) {
+          // 如果完全相同，只保留一个
+          if (a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h) {
+            if (i > j) { contained = true; break; }
+          } else {
+            contained = true;
+            break;
+          }
+        }
+      }
+      if (!contained) result.push(a);
+    }
+    return result;
+  }
+
+  /**
+   * 合并相邻空闲矩形：共享完整边且合并后仍为矩形的两个空闲区合并为一块，
+   * 减少碎片数量，让剩余余料尽可能成为规整的大块。
+   */
+  function mergeFreeRects(frees) {
+    let list = frees.filter(f => f.w > 0 && f.h > 0);
+    let changed = true;
+    let guard = 0;
+    while (changed && guard < 200) {
+      changed = false;
+      guard++;
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const a = list[i], b = list[j];
+          // 水平合并：同高且左右紧邻
+          if (a.y === b.y && a.h === b.h && a.x + a.w === b.x) {
+            list[i] = { x: a.x, y: a.y, w: a.w + b.w, h: a.h };
+            list.splice(j, 1);
+            changed = true;
+            break;
+          }
+          if (b.y === a.y && b.h === a.h && b.x + b.w === a.x) {
+            list[i] = { x: b.x, y: b.y, w: a.w + b.w, h: a.h };
+            list.splice(j, 1);
+            changed = true;
+            break;
+          }
+          // 垂直合并：同宽且上下紧邻
+          if (a.x === b.x && a.w === b.w && a.y + a.h === b.y) {
+            list[i] = { x: a.x, y: a.y, w: a.w, h: a.h + b.h };
+            list.splice(j, 1);
+            changed = true;
+            break;
+          }
+          if (b.x === a.x && b.w === a.w && b.y + b.h === a.y) {
+            list[i] = { x: b.x, y: b.y, w: a.w, h: a.h + b.h };
+            list.splice(j, 1);
+            changed = true;
+            break;
+          }
+        }
+        if (changed) break;
+      }
+    }
+    return pruneFreeRects(list);
+  }
+
+  // 主循环：逐个放置零件（首次适配递减 FFD）
+  const unplaced = [];
+
+  // ================================================================
+  // 【核心算法】单板最优搜索 (Sheet-level Optimal Search)
+  //
+  // 解决的根本问题：贪心算法（FFD + BAF/COM）按固定顺序逐件放置，
+  // 先放的横放零件会用水平切缝切断右侧完整高度的竖长条余料，
+  // 导致本可以竖放进去的零件塞不下——这就是用户说的「第21张板
+  // 右侧空白浪费」问题的根因。
+  //
+  // 思路：每次开新板时，对剩余未放置零件做带强剪枝的深度优先搜索，
+  // 找到该板能放下的零件数最多、且总面积最大的组合。
+  // 不被「一刀切」限制，只要求零件不重叠、不出界。
+  //
+  // 为了性能可控，做了多层剪枝：
+  //   1. 边界剪枝：剩余零件数 < 当前最优还差的数量时，直接放弃
+  //   2. 面积上界剪枝：剩余零件总面积 < 当前最优还差的面积时，放弃
+  //   3. 同尺寸去重：相同尺寸的零件跳过重复探索
+  //   4. 有限搜索深度：单张板最多搜索 N 个零件
+  //   5. 候选排序：按面积降序尝试，更早到达高利用率，增强剪枝
+  // ================================================================
+  function optimalFillSheet(itemPool) {
+    // 返回 { placed: [...], remainingPool: [...] }
+    // placed 是该板上最优布局的零件列表（含 x,y,w,h,rotated 等）
+    // remainingPool 是没放到这张板上的零件索引集合
+
+    const n = itemPool.length;
+    if (n === 0) return { placed: [], remaining: [] };
+
+    // 按面积降序排列候选，让搜索更快达到高利用率，增强剪枝效果
+    const indices = itemPool.map((_, i) => i);
+    indices.sort((a, b) => {
+      const aa = itemPool[a].width * itemPool[a].height;
+      const bb = itemPool[b].width * itemPool[b].height;
+      return bb - aa;
+    });
+
+    // 后缀面积和（从第 i 个到最后的总面积），用于面积上界剪枝
+    const suffixArea = new Array(n + 1).fill(0);
+    for (let i = n - 1; i >= 0; i--) {
+      const it = itemPool[indices[i]];
+      suffixArea[i] = suffixArea[i + 1] + it.width * it.height;
+    }
+
+    const sheetArea = sheetW * sheetH;
+    let bestCount = 0;
+    let bestArea = 0;
+    let bestPlacements = [];
+    let bestUsedMask = 0;
+    
+    // 节点数限制，防止极端情况性能爆炸
+    let nodesVisited = 0;
+    const MAX_NODES = 200000;
+
+    function dfs(idx, usedMask, frees, placements, placedCount, placedArea) {
+      nodesVisited++;
+      if (nodesVisited > MAX_NODES) return;
+
+      // 更新最优解
+      if (placedCount > bestCount ||
+          (placedCount === bestCount && placedArea > bestArea)) {
+        bestCount = placedCount;
+        bestArea = placedArea;
+        bestPlacements = placements.slice();
+        bestUsedMask = usedMask;
+      }
+
+      // 边界剪枝：剩余零件数不够超越最优
+      if (placedCount + (n - idx) <= bestCount) return;
+
+      // 面积剪枝：剩余总面积 + 当前面积 不优于最优面积
+      if (placedArea + suffixArea[idx] <= bestArea) return;
+
+      // 没有更多空闲矩形
+      if (frees.length === 0) return;
+
+      if (idx >= n) return;
+
+      const itemIdx = indices[idx];
+      const item = itemPool[itemIdx];
+
+      // === 分支1：不放这个零件，跳过 ===
+      // 同尺寸去重：如果前一个零件和当前零件尺寸相同且没被放，则跳过当前
+      // （避免相同尺寸的零件产生等价的搜索子树）
+      let skip = false;
+      if (idx > 0) {
+        const prevIdx = indices[idx - 1];
+        const prev = itemPool[prevIdx];
+        if (!(usedMask & (1 << (idx - 1))) && // 前一个也没放
+            prev.width === item.width && prev.height === item.height) {
+          skip = true; // 同尺寸且前一个没放，当前也跳过（去重）
+        }
+      }
+      if (!skip) {
+        dfs(idx + 1, usedMask, frees, placements, placedCount, placedArea);
+      }
+
+      // === 分支2：尝试放这个零件 ===
+      const orientations = item.rotatable !== false
+        ? [{ w: item.width, h: item.height, rotated: false },
+           { w: item.height, h: item.width, rotated: true }]
+        : [{ w: item.width, h: item.height, rotated: false }];
+
+      // 去重：横放和竖放尺寸相同时（正方形），只试一次
+      if (orientations.length === 2 && orientations[0].w === orientations[1].w &&
+          orientations[0].h === orientations[1].h) {
+        orientations.pop();
+      }
+
+      for (const orient of orientations) {
+        // 按 BL（底左）策略找第一个能放的空闲矩形
+        // 优先选 y 最小的，y 相同选 x 最小的 —— 让零件尽量靠左上角
+        let bestFr = null;
+        let bestFrIdx = -1;
+        for (let fi = 0; fi < frees.length; fi++) {
+          const fr = frees[fi];
+          if (orient.w <= fr.w + 0.01 && orient.h <= fr.h + 0.01) {
+            if (!bestFr || fr.y < bestFr.y || (fr.y === bestFr.y && fr.x < bestFr.x)) {
+              bestFr = fr;
+              bestFrIdx = fi;
+            }
+          }
+        }
+        if (!bestFr) continue;
+
+        // 放置：从 bestFr 的左上角放
+        const px = bestFr.x;
+        const py = bestFr.y;
+        const pw = orient.w;
+        const ph = orient.h;
+
+        // 分割空闲矩形（标准 MaxRectangles 方式：4 个方向切）
+        const newFrees = [];
+        for (let fi = 0; fi < frees.length; fi++) {
+          const fr = frees[fi];
+          if (fi === bestFrIdx) {
+            // 对被放入的那个空闲矩形做四分切割
+            // 右余
+            if (pw < fr.w - 0.01) {
+              newFrees.push({ x: fr.x + pw, y: fr.y, w: fr.w - pw, h: fr.h });
+            }
+            // 下余
+            if (ph < fr.h - 0.01) {
+              newFrees.push({ x: fr.x, y: fr.y + ph, w: fr.w, h: fr.h - ph });
+            }
+          } else {
+            // 其他空闲矩形：如果不相交则保留；相交则切割
+            if (px + pw <= fr.x + 0.01 || px >= fr.x + fr.w - 0.01 ||
+                py + ph <= fr.y + 0.01 || py >= fr.y + fr.h - 0.01) {
+              newFrees.push(fr);
+              continue;
+            }
+            // 上
+            if (py > fr.y + 0.01) {
+              newFrees.push({ x: fr.x, y: fr.y, w: fr.w, h: py - fr.y });
+            }
+            // 下
+            if (py + ph < fr.y + fr.h - 0.01) {
+              newFrees.push({ x: fr.x, y: py + ph, w: fr.w, h: fr.y + fr.h - (py + ph) });
+            }
+            // 左
+            if (px > fr.x + 0.01) {
+              const ly = Math.max(fr.y, py);
+              const lh = Math.min(fr.y + fr.h, py + ph) - ly;
+              if (lh > 0.01) {
+                newFrees.push({ x: fr.x, y: ly, w: px - fr.x, h: lh });
+              }
+            }
+            // 右
+            if (px + pw < fr.x + fr.w - 0.01) {
+              const ry = Math.max(fr.y, py);
+              const rh = Math.min(fr.y + fr.h, py + ph) - ry;
+              if (rh > 0.01) {
+                newFrees.push({ x: px + pw, y: ry, w: fr.x + fr.w - (px + pw), h: rh });
+              }
+            }
+          }
+        }
+
+        // 合并相邻空闲矩形（减少碎片，增强剪枝）
+        const merged = mergeFreeRectsSimple(newFrees);
+
+        const placement = {
+          partId: item.partId, name: item.name, x: px, y: py,
+          w: pw, h: ph, rotated: orient.rotated, color: item.color,
+          instance: item.instance,
+          originalW: item.width, originalH: item.height
+        };
+
+        placements.push(placement);
+        dfs(idx + 1, usedMask | (1 << idx), merged, placements,
+            placedCount + 1, placedArea + pw * ph);
+        placements.pop();
+
+        // 面积剪枝：如果已经放满（面积接近板材面积），不用继续搜了
+        if (bestArea >= sheetArea * 0.999) return;
+      }
+    }
+
+    // 简单合并相邻空闲矩形（仅合并共享完整边的）
+    function mergeFreeRectsSimple(list) {
+      let result = list.filter(f => f.w > 0.5 && f.h > 0.5);
+      let changed = true;
+      let guard = 0;
+      while (changed && guard < 20) {
+        changed = false;
+        guard++;
+        outer:
+        for (let i = 0; i < result.length; i++) {
+          for (let j = i + 1; j < result.length; j++) {
+            const a = result[i], b = result[j];
+            // 左右相邻、同高
+            if (Math.abs(a.h - b.h) < 0.5 && Math.abs(a.y - b.y) < 0.5) {
+              if (Math.abs(a.x + a.w - b.x) < 0.5) {
+                result.splice(j, 1);
+                result.splice(i, 1);
+                result.push({ x: a.x, y: a.y, w: a.w + b.w, h: a.h });
+                changed = true;
+                break outer;
+              }
+              if (Math.abs(b.x + b.w - a.x) < 0.5) {
+                result.splice(j, 1);
+                result.splice(i, 1);
+                result.push({ x: b.x, y: a.y, w: a.w + b.w, h: a.h });
+                changed = true;
+                break outer;
+              }
+            }
+            // 上下相邻、同宽
+            if (Math.abs(a.w - b.w) < 0.5 && Math.abs(a.x - b.x) < 0.5) {
+              if (Math.abs(a.y + a.h - b.y) < 0.5) {
+                result.splice(j, 1);
+                result.splice(i, 1);
+                result.push({ x: a.x, y: a.y, w: a.w, h: a.h + b.h });
+                changed = true;
+                break outer;
+              }
+              if (Math.abs(b.y + b.h - a.y) < 0.5) {
+                result.splice(j, 1);
+                result.splice(i, 1);
+                result.push({ x: a.x, y: b.y, w: a.w, h: a.h + b.h });
+                changed = true;
+                break outer;
+              }
+            }
+          }
+        }
+      }
+      // 去掉被包含的小矩形
+      result = result.filter((a, i) => {
+        for (let j = 0; j < result.length; j++) {
+          if (i === j) continue;
+          const b = result[j];
+          if (b.x <= a.x + 0.01 && b.y <= a.y + 0.01 &&
+              b.x + b.w >= a.x + a.w - 0.01 && b.y + b.h >= a.y + a.h - 0.01) {
+            if (!(b.x === a.x && b.y === a.y && b.w === a.w && b.h === a.h)) return false;
+          }
+        }
+        return true;
+      });
+      // 按面积降序
+      result.sort((a, b) => b.w * b.h - a.w * a.h);
+      return result;
+    }
+
+    // 启动搜索
+    const initialFrees = [{ x: 0, y: 0, w: sheetW, h: sheetH }];
+    dfs(0, 0, initialFrees, [], 0, 0);
+
+    // 收集结果：放置的零件 + 剩余零件
+    const placed = bestPlacements;
+    const remaining = [];
+    for (let i = 0; i < n; i++) {
+      if (!(bestUsedMask & (1 << i))) {
+        remaining.push(itemPool[indices[i]]);
+      }
+    }
+    // remaining 是按 indices 顺序的，可能跟原顺序不同，但没关系
+    // 因为还会继续排后续的板
+
+    return { placed, remaining, nodesVisited };
+  }
+
+  // 使用单板最优搜索来排板：
+  // 每次开新板时，从剩余零件中选出 DFS_LIMIT 件候选（面积降序取前N件），
+  // 用 DFS 求该板的最优填充。已放置的零件从剩余池移除，继续排下一张板。
+  // 当剩余零件 <= DFS_LIMIT 时，全部参与搜索（全局最优）。
+  const DFS_LIMIT = 20;
+  const remainingItems = items.slice();
+
+  while (remainingItems.length > 0) {
+    // 选候选：面积降序取前 DFS_LIMIT 件（让大零件优先参与决策）
+    remainingItems.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    const candidates = remainingItems.slice(0, Math.min(DFS_LIMIT, remainingItems.length));
+    const rest = remainingItems.slice(DFS_LIMIT);
+
+    const result = optimalFillSheet(candidates);
+
+    if (result.placed.length === 0) {
+      // 一件都放不进去：第一件标记为未放置
+      unplaced.push(candidates[0]);
+      remainingItems.length = 0;
+      for (let i = 1; i < candidates.length; i++) remainingItems.push(candidates[i]);
+      for (const r of rest) remainingItems.push(r);
+      continue;
+    }
+
+    // 构建新的剩余零件列表：candidates 中没放上的 + rest
+    const newRemaining = result.remaining.concat(rest);
+    remainingItems.length = 0;
+    for (const r of newRemaining) remainingItems.push(r);
+
+    // 计算该板的 freeRects
+    const fr = [{ x: 0, y: 0, w: sheetW, h: sheetH }];
+    for (const p of result.placed) {
+      const newFrees = [];
+      for (const f of fr) {
+        if (p.x + p.w <= f.x + 0.01 || p.x >= f.x + f.w - 0.01 ||
+            p.y + p.h <= f.y + 0.01 || p.y >= f.y + f.h - 0.01) {
+          newFrees.push(f);
+          continue;
+        }
+        if (p.y > f.y + 0.01) {
+          newFrees.push({ x: f.x, y: f.y, w: f.w, h: p.y - f.y });
+        }
+        if (p.y + p.h < f.y + f.h - 0.01) {
+          newFrees.push({ x: f.x, y: p.y + p.h, w: f.w, h: f.y + f.h - (p.y + p.h) });
+        }
+        if (p.x > f.x + 0.01) {
+          const ly = Math.max(f.y, p.y);
+          const lh = Math.min(f.y + f.h, p.y + p.h) - ly;
+          if (lh > 0.01) newFrees.push({ x: f.x, y: ly, w: p.x - f.x, h: lh });
+        }
+        if (p.x + p.w < f.x + f.w - 0.01) {
+          const ry = Math.max(f.y, p.y);
+          const rh = Math.min(f.y + f.h, p.y + p.h) - ry;
+          if (rh > 0.01) newFrees.push({ x: p.x + p.w, y: ry, w: f.x + f.w - (p.x + p.w), h: rh });
+        }
+      }
+      fr.length = 0;
+      for (const nf of newFrees) {
+        if (nf.w > 0.5 && nf.h > 0.5) fr.push(nf);
+      }
+    }
+
+    sheets.push(result.placed);
+    freeRects.push(mergeFreeRects(fr));
+  }
+
+  // ================================================================
+  // 【优化】多轮余料补填：对已有板的边角余料，尝试用剩余零件填充
+  //
+  // 解决的核心问题：贪心 FFD 按顺序放零件，前面的板放完大件后，
+  // 右侧/下方留下的窄长条余料，后续较窄的零件（尤其是旋转90°后）
+  // 其实能放进去，但 FFD 不会回过头去填前面的板。
+  //
+  // 策略：每一轮遍历所有未放置零件，尝试放入任何一张已有板的空闲矩形。
+  // 重复直到一轮下来没有新增放置。
+  // ================================================================
+  let pass = 0;
+  const maxPasses = 10; // 最多10轮补填，防止极端情况死循环
+  while (unplaced.length > 0 && pass < maxPasses) {
+    pass++;
+    let placedAny = false;
+
+    for (let ui = unplaced.length - 1; ui >= 0; ui--) {
+      const item = unplaced[ui];
+      let placedIdx = -1;
+      for (let si = 0; si < sheets.length; si++) {
+        if (placeInSheet(si, item)) {
+          placedIdx = si;
+          break;
+        }
+      }
+      if (placedIdx >= 0) {
+        unplaced.splice(ui, 1);
+        placedAny = true;
+      }
+    }
+
+    if (!placedAny) break; // 这轮没放进任何零件，结束补填
+  }
+
+  // ================================================================
+  // 【优化2】合并相邻空闲矩形 + 再补填
+  //
+  // 解决 MaxRectangles 的核心问题：右侧长条余料被水平切割成上下两块，
+  // 每块高度都不够竖放一个零件，导致空间浪费。
+  //
+  // 方法：先合并所有上下/左右相邻且对齐的空闲矩形（恢复右侧完整长条），
+  // 然后再做一轮补填，竖放的零件就能塞进右侧长条了。
+  // ================================================================
+  function mergeAdjacentFreeRects(frees) {
+    let merged = frees.slice();
+    let changed = true;
+    let guard = 0;
+    while (changed && guard < 50) {
+      changed = false;
+      guard++;
+      outer:
+      for (let i = 0; i < merged.length; i++) {
+        for (let j = i + 1; j < merged.length; j++) {
+          const a = merged[i], b = merged[j];
+          // 上下堆叠且宽度相同（x对齐）
+          if (Math.abs(a.w - b.w) < 0.5 && Math.abs(a.x - b.x) < 0.5) {
+            if (Math.abs(a.y + a.h - b.y) < 0.5) {
+              merged.splice(j, 1); merged.splice(i, 1);
+              merged.push({ x: a.x, y: a.y, w: a.w, h: a.h + b.h });
+              changed = true; break outer;
+            }
+            if (Math.abs(b.y + b.h - a.y) < 0.5) {
+              merged.splice(j, 1); merged.splice(i, 1);
+              merged.push({ x: a.x, y: b.y, w: a.w, h: a.h + b.h });
+              changed = true; break outer;
+            }
+          }
+          // 左右并排且高度相同（y对齐）
+          if (Math.abs(a.h - b.h) < 0.5 && Math.abs(a.y - b.y) < 0.5) {
+            if (Math.abs(a.x + a.w - b.x) < 0.5) {
+              merged.splice(j, 1); merged.splice(i, 1);
+              merged.push({ x: a.x, y: a.y, w: a.w + b.w, h: a.h });
+              changed = true; break outer;
+            }
+            if (Math.abs(b.x + b.w - a.x) < 0.5) {
+              merged.splice(j, 1); merged.splice(i, 1);
+              merged.push({ x: b.x, y: a.y, w: a.w + b.w, h: a.h });
+              changed = true; break outer;
+            }
+          }
+        }
+      }
+    }
+    return merged;
+  }
+
+  // 对每张板合并相邻空闲矩形，再尝试补填未放置零件
+  if (unplaced.length > 0) {
+    for (let si = 0; si < sheets.length; si++) {
+      freeRects[si] = mergeAdjacentFreeRects(freeRects[si]);
+    }
+    // 合并后再做多轮补填
+    let mergePass = 0;
+    while (unplaced.length > 0 && mergePass < 5) {
+      mergePass++;
+      let placedAny = false;
+      for (let ui = unplaced.length - 1; ui >= 0; ui--) {
+        const item = unplaced[ui];
+        for (let si = 0; si < sheets.length; si++) {
+          if (placeInSheet(si, item)) {
+            unplaced.splice(ui, 1);
+            placedAny = true;
+            break;
+          }
+        }
+      }
+      if (!placedAny) break;
+    }
+  }
+
+  // 计算统计
+  const sheetArea = sheetW * sheetH;
+  let totalUsed = 0;
+  sheets.forEach(s => s.forEach(p => { totalUsed += p.w * p.h; }));
+  const totalSheetArea = sheets.length * sheetArea;
+  const efficiency = totalSheetArea > 0 ? (totalUsed / totalSheetArea * 100) : 0;
+
+  return {
+    sheets,
+    unplaced,
+    freeRects,
+    stats: {
+      sheetCount: sheets.length,
+      totalUsed,
+      totalWaste: totalSheetArea - totalUsed,
+      efficiency,
+      totalParts: items.length - unplaced.length,
+      unplacedCount: unplaced.length
+    },
+    sheetW,
+    sheetH,
+    heuristic
+  };
+}
+
+/**
+ * Guillotine 递归切割装箱算法（多策略并行优化版）
+ *
+ * 核心改进：
+ * 1. 同时尝试 6 种经典 Guillotine 策略（BAF/BLSF/BSSF × Shorter/Longer Left 切割规则），
+ *    取利用率最高的方案，解决单一贪心策略陷入局部最优的问题。
+ * 2. 每次放置零件时，横放 + 竖放（rotatable 时）两种方向都评估，选最优。
+ * 3. 每张板放完后执行「行尾竖放补填」：对窄高型剩余区域，优先尝试竖放零件填充，
+ *    解决原算法右侧空白浪费的问题（如第21张板 728×547 余料可竖放 543×852 零件）。
+ * 4. 纹理板（rotatable=false）逻辑保持不变。
+ *
+ * 学术依据：Guillotine 切割策略中，BLSF + Shorter Left 通常表现最好，但不同数据
+ * 集最优策略不同，多策略并行能覆盖更多场景，平均比单一策略提升 2-5% 利用率。
+ */
+function guillotinePack(parts, sheetW, sheetH, kerf, sortMode) {
+  // 展开零件实例
+  let items = [];
+  parts.forEach(p => {
+    for (let i = 0; i < p.qty; i++) {
+      items.push({
+        partId: p.id, name: p.name, width: p.width, height: p.height,
+        rotatable: p.rotatable, color: p.color, instance: i + 1
+      });
+    }
+  });
+
+  const sortFns = {
+    area: (a, b) => (b.width * b.height) - (a.width * a.height),
+    longSide: (a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height),
+    width: (a, b) => b.width - a.width,
+    height: (a, b) => b.height - a.height,
+    perimeter: (a, b) => (b.width + b.height) - (a.width + a.height)
+  };
+
+  // 6 种 Guillotine 策略选择器：返回评分（越小越好，找最小）
+  // 选择规则 × 切割规则：
+  //   BAF  (Best Area Fit)       — 空闲矩形面积最贴合
+  //   BLSF (Best Long Side Fit)  — 空闲矩形长边最贴合
+  //   BSSF (Best Short Side Fit) — 空闲矩形短边最贴合
+  // 切割规则：
+  //   SHORTER_LEAD — 短方向优先切（短余料+整大块）
+  //   LONGER_LEAD  — 长方向优先切（长余料+小块）
+  const STRATEGIES = [
+    { name: 'BAF_SL', select: 'BAF', split: 'SHORTER_LEAD' },
+    { name: 'BAF_LL', select: 'BAF', split: 'LONGER_LEAD' },
+    { name: 'BLSF_SL', select: 'BLSF', split: 'SHORTER_LEAD' },
+    { name: 'BLSF_LL', select: 'BLSF', split: 'LONGER_LEAD' },
+    { name: 'BSSF_SL', select: 'BSSF', split: 'SHORTER_LEAD' },
+    { name: 'BSSF_LL', select: 'BSSF', split: 'LONGER_LEAD' }
+  ];
+
+  function getOrientations(item) {
+    if (item.rotatable === false) {
+      return [{ w: item.width, h: item.height, rotated: false }];
+    }
+    return [
+      { w: item.width, h: item.height, rotated: false },
+      { w: item.height, h: item.width, rotated: true }
+    ];
+  }
+
+  function calcScore(fr, pw, ph, rule) {
+    const leftoverW = fr.w - pw;
+    const leftoverH = fr.h - ph;
+    switch (rule) {
+      case 'BAF':  return fr.w * fr.h - pw * ph;          // 面积差
+      case 'BLSF': return Math.max(leftoverW, leftoverH); // 长边余料
+      case 'BSSF': return Math.min(leftoverW, leftoverH); // 短边余料
+      default:     return fr.w * fr.h - pw * ph;
+    }
+  }
+
+  // 切割空闲矩形：放置零件后，按规则生成两个子矩形
+  function splitRect(fr, pw, ph, splitRule) {
+    const wRem = fr.w - pw;
+    const hRem = fr.h - ph;
+    const result = [];
+
+    if (wRem <= 0.5 && hRem <= 0.5) return result; // 填满
+    if (wRem <= 0.5) {
+      result.push({ x: fr.x, y: fr.y + ph, w: fr.w, h: hRem });
+      return result;
+    }
+    if (hRem <= 0.5) {
+      result.push({ x: fr.x + pw, y: fr.y, w: wRem, h: fr.h });
+      return result;
+    }
+
+    // SHORTER_LEAD：短边方向先切，让大块余料连成一整片
+    // 即：哪个方向余料更少，就把它作为「侧条」切割掉
+    // 横向切：右条高=ph（短侧条），下方条宽=fr.w（整宽大块）
+    // 纵向切：右条高=fr.h（整高长条），下方条宽=pw（小块）
+    let horizontalFirst;
+    if (splitRule === 'SHORTER_LEAD') {
+      // 比较右条面积 vs 下方条面积，让较小的那个做侧条
+      const sideStripArea = wRem * ph;     // 右侧条（高=零件高）
+      const bottomStripArea = pw * hRem;   // 下方条（宽=零件宽）
+      horizontalFirst = sideStripArea <= bottomStripArea;
+    } else { // LONGER_LEAD
+      const sideStripArea = wRem * ph;
+      const bottomStripArea = pw * hRem;
+      horizontalFirst = sideStripArea > bottomStripArea;
+    }
+
+    if (horizontalFirst) {
+      // 横切：右条高度=零件高度，下方条宽度=整块宽度
+      result.push({ x: fr.x + pw, y: fr.y, w: wRem, h: ph });
+      result.push({ x: fr.x, y: fr.y + ph, w: fr.w, h: hRem });
+    } else {
+      // 竖切：右条高度=整块高度，下方条宽度=零件宽度
+      result.push({ x: fr.x + pw, y: fr.y, w: wRem, h: fr.h });
+      result.push({ x: fr.x, y: fr.y + ph, w: pw, h: hRem });
+    }
+    return result;
+  }
+
+  function cleanupRects(rects) {
+    let result = rects.filter(r => r.w > 0.5 && r.h > 0.5);
+    result = result.filter((r, i) => {
+      for (let j = 0; j < result.length; j++) {
+        if (i === j) continue;
+        const o = result[j];
+        if (o.x <= r.x + 0.01 && o.y <= r.y + 0.01 &&
+            o.x + o.w >= r.x + r.w - 0.01 && o.y + o.h >= r.y + r.h - 0.01) {
+          if (!(o.x === r.x && o.y === r.y && o.w === r.w && o.h === r.h)) return false;
+        }
+      }
+      return true;
+    });
+    // 按面积降序：优先填充大块，提高大块利用率
+    result.sort((a, b) => b.w * b.h - a.w * b.h);
+    return result;
+  }
+
+  // 合并相邻的空闲矩形（上下堆叠且宽度相同 / 左右并排且高度相同）
+  // 解决 Guillotine 切割后右侧长条被水平分割、无法竖放零件的问题
+  function mergeAdjacentRects(rects) {
+    let merged = rects.slice();
+    let changed = true;
+    let guard = 0;
+    while (changed && guard < 50) {
+      changed = false;
+      guard++;
+      outer:
+      for (let i = 0; i < merged.length; i++) {
+        for (let j = i + 1; j < merged.length; j++) {
+          const a = merged[i], b = merged[j];
+          // 上下堆叠且宽度相同（x对齐）
+          if (Math.abs(a.w - b.w) < 0.5 && Math.abs(a.x - b.x) < 0.5) {
+            if (Math.abs(a.y + a.h - b.y) < 0.5) {
+              // a在上，b在下
+              merged.splice(j, 1);
+              merged.splice(i, 1);
+              merged.push({ x: a.x, y: a.y, w: a.w, h: a.h + b.h });
+              changed = true;
+              break outer;
+            }
+            if (Math.abs(b.y + b.h - a.y) < 0.5) {
+              // b在上，a在下
+              merged.splice(j, 1);
+              merged.splice(i, 1);
+              merged.push({ x: a.x, y: b.y, w: a.w, h: a.h + b.h });
+              changed = true;
+              break outer;
+            }
+          }
+          // 左右并排且高度相同（y对齐）
+          if (Math.abs(a.h - b.h) < 0.5 && Math.abs(a.y - b.y) < 0.5) {
+            if (Math.abs(a.x + a.w - b.x) < 0.5) {
+              // a在左，b在右
+              merged.splice(j, 1);
+              merged.splice(i, 1);
+              merged.push({ x: a.x, y: a.y, w: a.w + b.w, h: a.h });
+              changed = true;
+              break outer;
+            }
+            if (Math.abs(b.x + b.w - a.x) < 0.5) {
+              // b在左，a在右
+              merged.splice(j, 1);
+              merged.splice(i, 1);
+              merged.push({ x: b.x, y: a.y, w: a.w + b.w, h: a.h });
+              changed = true;
+              break outer;
+            }
+          }
+        }
+      }
+    }
+    return merged;
+  }
+
+  // 行尾竖放补填：遍历所有空闲矩形，对窄高型区域尝试竖放零件
+  // 这是专门解决「右侧空白区能竖放一个零件但贪心算法没放」的问题
+  function tailFill(sheetData, remainingItems, strategy) {
+    let placed = 0;
+    const frees = sheetData.freeRects;
+    const sheetPlaced = sheetData.placed;
+
+    let changed = true;
+    let guard = 0;
+    while (changed && guard < 200) {
+      changed = false;
+      guard++;
+
+      // 对每个空闲矩形，尝试放一个剩余零件
+      for (let fi = 0; fi < frees.length; fi++) {
+        const fr = frees[fi];
+        // 只对「窄高型」或「与零件尺寸接近的」矩形做补填尝试
+        // （普通大块会在主循环里被正常填充，这里处理被忽略的边角余料）
+
+        let bestPick = null;
+        let bestScore = Infinity;
+        let bestItemIdx = -1;
+
+        for (let ii = 0; ii < remainingItems.length; ii++) {
+          const item = remainingItems[ii];
+          if (item._used) continue;
+          const orientations = getOrientations(item);
+
+          for (const orient of orientations) {
+            if (orient.w > fr.w + 0.01 || orient.h > fr.h + 0.01) continue;
+            const score = calcScore(fr, orient.w, orient.h, strategy.select);
+            // 优先选择面积利用率高的（评分小）
+            if (score < bestScore) {
+              bestScore = score;
+              bestPick = { orient, fr, fi };
+              bestItemIdx = ii;
+            }
+          }
+        }
+
+        if (bestPick) {
+          const item = remainingItems[bestItemIdx];
+          const { orient, fr, fi } = bestPick;
+
+          sheetPlaced.push({
+            partId: item.partId, name: item.name,
+            x: fr.x, y: fr.y, w: orient.w, h: orient.h,
+            rotated: orient.rotated, color: item.color,
+            instance: item.instance
+          });
+
+          // 切割并更新 freeRects
+          const subRects = splitRect(fr, orient.w, orient.h, strategy.split);
+          frees.splice(fi, 1);
+          for (const sr of subRects) {
+            if (sr.w > 0.5 && sr.h > 0.5) frees.push(sr);
+          }
+          sheetData.freeRects = cleanupRects(frees);
+
+          item._used = true;
+          placed++;
+          changed = true;
+          break; // 重新从第一个空闲矩形开始扫描
+        }
+      }
+    }
+    return placed;
+  }
+
+  // 用指定策略跑一遍 Guillotine 排版
+  function runStrategy(itemsArr, strategy) {
+    const sortedItems = itemsArr.slice();
+    sortedItems.sort(sortFns[sortMode] || sortFns.area);
+
+    // 重置 _used 标记
+    sortedItems.forEach(it => { it._used = false; });
+
+    const sheets = [];
+    const sheetFreeRects = [];
+
+    // 用一个指针记录已放置的数量，避免修改原数组
+    let remaining = sortedItems.slice();
+
+    while (remaining.length > 0) {
+      const sheetPlaced = [];
+      let frees = [{ x: 0, y: 0, w: sheetW, h: sheetH }];
+      const sheetData = { placed: sheetPlaced, freeRects: frees };
+
+      // 主循环：逐个放置零件
+      for (let ii = 0; ii < remaining.length; ii++) {
+        const item = remaining[ii];
+        if (item._used) continue;
+        const orientations = getOrientations(item);
+
+        let bestScore = Infinity;
+        let bestFreeIdx = -1;
+        let bestOrient = null;
+
+        for (let fi = 0; fi < frees.length; fi++) {
+          const fr = frees[fi];
+          for (const orient of orientations) {
+            if (orient.w > fr.w + 0.01 || orient.h > fr.h + 0.01) continue;
+            const score = calcScore(fr, orient.w, orient.h, strategy.select);
+            if (score < bestScore ||
+                (score === bestScore && bestFreeIdx >= 0 &&
+                 fr.w * fr.h < frees[bestFreeIdx].w * frees[bestFreeIdx].h)) {
+              bestScore = score;
+              bestFreeIdx = fi;
+              bestOrient = orient;
+            }
+          }
+        }
+
+        if (bestFreeIdx >= 0 && bestOrient) {
+          const fr = frees[bestFreeIdx];
+          sheetPlaced.push({
+            partId: item.partId, name: item.name,
+            x: fr.x, y: fr.y, w: bestOrient.w, h: bestOrient.h,
+            rotated: bestOrient.rotated, color: item.color,
+            instance: item.instance
+          });
+
+          const subRects = splitRect(fr, bestOrient.w, bestOrient.h, strategy.split);
+          frees.splice(bestFreeIdx, 1);
+          for (const sr of subRects) {
+            if (sr.w > 0.5 && sr.h > 0.5) frees.push(sr);
+          }
+          frees = cleanupRects(frees);
+          sheetData.freeRects = frees;
+          item._used = true;
+        }
+      }
+
+      // 行尾补填：先合并相邻空闲矩形（使右侧长条恢复完整高度），再尝试竖放填充
+      sheetData.freeRects = mergeAdjacentRects(sheetData.freeRects);
+      tailFill(sheetData, remaining, strategy);
+      frees = sheetData.freeRects;
+
+      if (sheetPlaced.length === 0) break; // 放不进任何零件，终止
+
+      sheets.push(sheetPlaced);
+      sheetFreeRects.push(frees);
+
+      // 过滤掉已放置的零件
+      remaining = remaining.filter(it => !it._used);
+    }
+
+    return { sheets, freeRects: sheetFreeRects, unplaced: remaining };
+  }
+
+  // ============================================================
+  // 主流程：多策略并行，选最优
+  // ============================================================
+  let bestResult = null;
+  let bestEff = -1;
+
+  for (const strat of STRATEGIES) {
+    const result = runStrategy(items, strat);
+    const usedArea = result.sheets.reduce((s, sh) =>
+      s + sh.reduce((ss, p) => ss + p.w * p.h, 0), 0);
+    const sheetArea = sheetW * sheetH;
+    const totalArea = result.sheets.length * sheetArea;
+    const eff = totalArea > 0 ? usedArea / totalArea : 0;
+
+    // 评价标准：优先用板数少；板数相同时优先利用率高
+    if (!bestResult ||
+        result.sheets.length < bestResult.sheets.length ||
+        (result.sheets.length === bestResult.sheets.length && eff > bestEff)) {
+      bestResult = result;
+      bestEff = eff;
+    }
+  }
+
+  const usedArea = bestResult.sheets.reduce((s, sh) =>
+    s + sh.reduce((ss, p) => ss + p.w * p.h, 0), 0);
+  const sheetArea = sheetW * sheetH;
+  const totalSheetArea = bestResult.sheets.length * sheetArea;
+  const totalParts = items.length;
+  const unplacedCount = bestResult.unplaced.length;
+
+  return {
+    sheets: bestResult.sheets,
+    freeRects: bestResult.freeRects,
+    unplaced: bestResult.unplaced.map(u => ({
+      partId: u.partId, name: u.name, width: u.width, height: u.height,
+      rotatable: u.rotatable, color: u.color, instance: u.instance
+    })),
+    stats: {
+      sheetCount: bestResult.sheets.length,
+      totalParts: totalParts,
+      placedCount: totalParts - unplacedCount,
+      unplacedCount: unplacedCount,
+      usedArea,
+      efficiency: totalSheetArea > 0 ? (usedArea / totalSheetArea * 100) : 0
+    },
+    sheetW, sheetH,
+    heuristic: 'GUILLOTINE'
+  };
+}
+
+/**
+ * 行混合优化排版策略
+ * 对统一尺寸零件，枚举所有「竖放行数 × 横放行数」组合，
+ * 找到一张板能容纳最多零件的全局最优布局。
+ * 弥补贪心算法不会回溯调整的缺陷（如 2行竖放+3行横放=46件）。
+ * 多种尺寸零件时自动回退到 Guillotine。
+ * 纹理板（rotatable=false）不支持横放，退化为纯竖放。
+ */
+function rowMixPack(parts, sheetW, sheetH, kerf, sortMode) {
+  // 只支持单一尺寸零件
+  const sizeKeys = new Set(parts.map(p => p.width + 'x' + p.height));
+  if (sizeKeys.size > 1) {
+    return guillotinePack(parts, sheetW, sheetH, kerf, sortMode);
+  }
+
+  const proto = parts[0];
+  const totalQty = parts.reduce((s, x) => s + x.qty, 0);
+  const canRotate = proto.rotatable !== false;
+
+  // 有效占位尺寸（含锯缝）
+  const vW = proto.width + kerf, vH = proto.height + kerf;   // 竖放
+  const hW = proto.height + kerf, hH = proto.width + kerf;  // 横放
+
+  const vPerRow = Math.floor(sheetW / vW);
+  const hPerRow = canRotate ? Math.floor(sheetW / hW) : 0;
+
+  // 枚举一张板的最优行组合 (n行竖放 + m行横放)
+  let bestCombo = null;
+  const maxN = Math.floor(sheetH / vH);
+  for (let n = 0; n <= maxN; n++) {
+    const remainH = sheetH - n * vH;
+    const maxM = canRotate ? Math.floor(remainH / hH) : 0;
+    for (let m = 0; m <= maxM; m++) {
+      if (n === 0 && m === 0) continue;
+      const capacity = n * vPerRow + m * hPerRow;
+      if (capacity <= 0) continue;
+      const usedH = n * vH + m * hH;
+      // 优先：容量≥需求量时选用量最小的；容量不足时选容量最大的
+      if (!bestCombo) { bestCombo = { n, m, capacity, usedH }; continue; }
+      const curFit = capacity >= totalQty;
+      const bestFit = bestCombo.capacity >= totalQty;
+      if (curFit && !bestFit) { bestCombo = { n, m, capacity, usedH }; }
+      else if (curFit && bestFit) {
+        if (usedH < bestCombo.usedH) bestCombo = { n, m, capacity, usedH };
+      } else if (!curFit && !bestFit) {
+        if (capacity > bestCombo.capacity) bestCombo = { n, m, capacity, usedH };
+      }
+    }
+  }
+
+  if (!bestCombo || bestCombo.capacity <= 0) {
+    return guillotinePack(parts, sheetW, sheetH, kerf, sortMode);
+  }
+
+  // 生成排版：多张板，前几张按最优组合放满，最后一张放剩余
+  const sheets = [];
+  const freeRects = [];
+  let remaining = totalQty;
+  const perSheet = bestCombo.capacity;
+  const numFullSheets = Math.floor(remaining / perSheet);
+  const lastSheetQty = remaining % perSheet;
+
+  function buildSheet(qty) {
+    const placed = [];
+    let idx = 0;
+    let y = 0;
+    // 竖放行
+    for (let r = 0; r < bestCombo.n && idx < qty; r++) {
+      for (let c = 0; c < vPerRow && idx < qty; c++) {
+        placed.push({
+          partId: proto.id, name: proto.name, x: c * vW, y: y,
+          w: vW, h: vH, rotated: false, color: proto.color,
+          instance: idx + 1
+        });
+        idx++;
+      }
+      y += vH;
+    }
+    // 横放行
+    for (let r = 0; r < bestCombo.m && idx < qty; r++) {
+      for (let c = 0; c < hPerRow && idx < qty; c++) {
+        placed.push({
+          partId: proto.id, name: proto.name, x: c * hW, y: y,
+          w: hW, h: hH, rotated: true, color: proto.color,
+          instance: idx + 1
+        });
+        idx++;
+      }
+      y += hH;
+    }
+    // 剩余空间作为 freeRect
+    const fr = [];
+    if (y < sheetH) fr.push({ x: 0, y: y, w: sheetW, h: sheetH - y });
+    return { placed, fr };
+  }
+
+  for (let s = 0; s < numFullSheets; s++) {
+    const { placed, fr } = buildSheet(perSheet);
+    sheets.push(placed); freeRects.push(fr);
+    remaining -= perSheet;
+  }
+  if (lastSheetQty > 0) {
+    const { placed, fr } = buildSheet(lastSheetQty);
+    sheets.push(placed); freeRects.push(fr);
+  }
+
+  const usedArea = sheets.reduce((s, sh) => s + sh.reduce((ss, p) => ss + p.w * p.h, 0), 0);
+  const sheetArea = sheetW * sheetH;
+
+  return {
+    sheets, freeRects, unplaced: [],
+    stats: {
+      sheetCount: sheets.length,
+      totalParts: totalQty,
+      placedCount: totalQty,
+      unplacedCount: 0,
+      usedArea,
+      efficiency: sheets.length > 0 ? (usedArea / (sheets.length * sheetArea)) * 100 : 0
+    },
+    sheetW, sheetH,
+    heuristic: 'ROW_MIX'
+  };
+}
+
+/**
+ * 考虑锯缝的排版：将锯缝宽度加到零件尺寸上，最后从利用率中扣除锯缝面积
+ */
+function packWithKerf(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
+  // 给每个零件尺寸加上锯缝（零件之间需要锯缝，边缘不需要）
+  // 简化模型：每个零件的有效占位 = 实际尺寸 + 锯缝
+  // 但这样会多算边缘的锯缝，所以在统计时修正
+  const adjustedParts = parts.map(p => ({
+    ...p,
+    width: p.width + kerf,
+    height: p.height + kerf
+  }));
+
+  const result = heuristic === 'GUILLOTINE'
+    ? guillotinePack(adjustedParts, sheetW, sheetH, 0, sortMode)
+    : heuristic === 'ROW_MIX'
+    ? rowMixPack(adjustedParts, sheetW, sheetH, 0, sortMode)
+    : maxRectanglesPack(adjustedParts, sheetW, sheetH, 0, heuristic, sortMode);
+
+  // 修正放置坐标和尺寸（减去锯缝偏移）
+  result.sheets.forEach(sheet => {
+    sheet.forEach(p => {
+      p.w = p.w - kerf;
+      p.h = p.h - kerf;
+    });
+  });
+
+  // 重新计算统计（用实际零件尺寸）
+  let totalUsed = 0;
+  result.sheets.forEach(s => s.forEach(p => { totalUsed += p.w * p.h; }));
+  const sheetArea = sheetW * sheetH;
+  const totalSheetArea = result.sheets.length * sheetArea;
+  // 锯缝占用面积估算
+  let kerfArea = 0;
+  result.sheets.forEach(s => {
+    s.forEach(p => {
+      // 每个零件的右边缘和下边缘锯缝（近似）
+      kerfArea += (p.w + p.h) * kerf;
+    });
+  });
+
+  result.stats.totalUsed = totalUsed;
+  result.stats.totalWaste = totalSheetArea - totalUsed;
+  result.stats.efficiency = totalSheetArea > 0 ? (totalUsed / totalSheetArea * 100) : 0;
+  result.stats.kerfArea = kerfArea;
+
+  return result;
+}
+
+// ========== 执行排版 ==========
+function runOptimization() {
+  const sheetW = parseFloat($('sheetWidth').value);
+  const sheetH = parseFloat($('sheetHeight').value);
+  const kerf = parseFloat($('sawKerf').value) || 0;
+  const sheetCount = parseInt($('sheetCount').value);
+  const strategy = $('strategySelect').value;
+  const sheetType = $('sheetType').value;
+
+  if (!sheetW || sheetW <= 0) { showToast('请输入有效的板材长度', 'error'); return; }
+  if (!sheetH || sheetH <= 0) { showToast('请输入有效的板材宽度', 'error'); return; }
+  if (state.parts.length === 0) { showToast('请先添加零件', 'error'); return; }
+
+  // 纹理板：所有零件方向必须一致 —— 长边统一沿板材长边（纹理方向）固定放置，
+  // 不允许随意 90° 旋转（否则纹理方向会互相垂直）
+  const effParts = sheetType === 'textured'
+    ? state.parts.map(p => {
+        const longW = Math.max(p.width, p.height);
+        const shortW = Math.min(p.width, p.height);
+        const alongWidth = sheetW >= sheetH; // 板材长边方向即纹理方向
+        return Object.assign({}, p, {
+          width: alongWidth ? longW : shortW,
+          height: alongWidth ? shortW : longW,
+          rotatable: false
+        });
+      })
+    : state.parts;
+
+  // 检查零件是否超过板材尺寸（考虑锯缝）
+  for (const p of effParts) {
+    const effW = p.width + kerf;
+    const effH = p.height + kerf;
+    const maxDim = Math.max(effW, effH);
+    const minDim = Math.min(effW, effH);
+    const sheetMax = Math.max(sheetW, sheetH);
+    const sheetMin = Math.min(sheetW, sheetH);
+    if (maxDim > sheetMax || (minDim > sheetMin && !p.rotatable)) {
+      showToast(`零件「${p.name}」加锯缝后尺寸超过板材，无法切割`, 'error');
+      return;
+    }
+    if (effW > sheetW && effH > sheetH && !p.rotatable) {
+      showToast(`零件「${p.name}」加锯缝后超过板材且不允许旋转`, 'error');
+      return;
+    }
+    if (p.rotatable && effW > sheetMax && effH > sheetMax) {
+      showToast(`零件「${p.name}」加锯缝后尺寸超过板材最大边`, 'error');
+      return;
+    }
+  }
+
+  showToast('正在计算最优排版方案...');
+
+  // 异步执行，避免UI阻塞
+  setTimeout(() => {
+    let bestResult = null;
+
+    if (strategy === 'auto') {
+      // 运行所有启发式 × 多种排序维度，多目标择优：
+      // 1) 优先利用率：明显更高（相差 > 0.5%）的方案胜出；
+      // 2) 利用率接近时，选「最大连续余料块」最大的方案——余料保持为整块大矩形，
+      //    便于再次利用，避免余料被切成碎块/异形；
+      // 3) 最大余料块相同时，选碎片数量更少的方案。
+      const heuristics = ['COM', 'BSSF', 'BLSF', 'BAF', 'BL', 'GUILLOTINE', 'ROW_MIX'];
+      const sortModes = ['area', 'longSide', 'width', 'height', 'perimeter'];
+      const results = [];
+      for (const h of heuristics) {
+        for (const s of sortModes) {
+          results.push(packWithKerf(effParts, sheetW, sheetH, kerf, h, s));
+        }
+      }
+      const bestEff = Math.max(...results.map(r => r.stats.efficiency));
+      // 利用率在最高值 ±0.5% 之内的方案进入决赛圈
+      const finalists = results.filter(r => r.stats.efficiency >= bestEff - 0.5);
+
+      function maxFreeBlockArea(result) {
+        let max = 0;
+        if (result.freeRects) {
+          for (const fr of result.freeRects) {
+            for (const f of fr) {
+              if (f.w * f.h > max) max = f.w * f.h;
+            }
+          }
+        }
+        return max;
+      }
+      function totalFragments(result) {
+        let n = 0;
+        if (result.freeRects) {
+          for (const fr of result.freeRects) n += fr.length;
+        }
+        return n;
+      }
+
+      bestResult = finalists[0];
+      for (const r of finalists) {
+        if (maxFreeBlockArea(r) > maxFreeBlockArea(bestResult)) {
+          bestResult = r;
+        } else if (maxFreeBlockArea(r) === maxFreeBlockArea(bestResult) && totalFragments(r) < totalFragments(bestResult)) {
+          bestResult = r;
+        }
+      }
+    } else {
+      bestResult = packWithKerf(effParts, sheetW, sheetH, kerf, strategy, 'area');
+    }
+
+    // 如果指定了板材数量且结果超过，给出警告
+    if (sheetCount > 0 && bestResult.stats.sheetCount > sheetCount) {
+      showToast(`警告：需要 ${bestResult.stats.sheetCount} 张板，超过指定的 ${sheetCount} 张`, 'error');
+    }
+
+    if (bestResult.stats.unplacedCount > 0) {
+      showToast(`${bestResult.stats.unplacedCount} 个零件未能放置（板材不足）`, 'error');
+    }
+
+    state.results = bestResult;
+    state.activeSheet = 0;
+    renderResults();
+    // 移动端：计算完成后自动切换到「排版结果」视图
+    if (window.innerWidth <= 768) setMobileView('result');
+    showToast(`排版完成！使用 ${bestResult.stats.sheetCount} 张板，利用率 ${bestResult.stats.efficiency.toFixed(1)}%`, 'success');
+  }, 50);
+}
+
+// ========== 渲染结果 ==========
+function renderResults() {
+  if (!state.results) return;
+
+  const r = state.results;
+
+  // 显示统计栏
+  $('statsBar').style.display = 'flex';
+  $('statSheets').innerHTML = r.stats.sheetCount + '<span class="unit">张</span>';
+  $('statUsed').innerHTML = formatArea(r.stats.totalUsed) + '<span class="unit">m²</span>';
+  $('statWaste').innerHTML = formatArea(r.stats.totalWaste) + '<span class="unit">m²</span>';
+  $('statEfficiency').innerHTML = r.stats.efficiency.toFixed(1) + '<span class="unit">%</span>';
+  $('statParts').innerHTML = r.stats.totalParts + '<span class="unit">件</span>';
+
+  // 渲染板材标签
+  const tabsContainer = $('sheetsTabs');
+  tabsContainer.style.display = 'flex';
+  tabsContainer.innerHTML = r.sheets.map((sheet, idx) => {
+    const usedArea = sheet.reduce((sum, p) => sum + p.w * p.h, 0);
+    const sheetArea = r.sheetW * r.sheetH;
+    const usage = (usedArea / sheetArea * 100).toFixed(0);
+    return `<button class="sheet-tab ${idx === state.activeSheet ? 'active' : ''}" onclick="switchSheet(${idx})">
+      第 ${idx + 1} 张<span class="tab-usage">${usage}%</span>
+    </button>`;
+  }).join('');
+
+  // 渲染当前板材可视化
+  renderSheetVisualization();
+
+  // 渲染切割清单
+  renderCutList();
+
+  // 显示切割清单面板
+  $('cutListPanel').style.display = 'flex';
+}
+
+function switchSheet(idx) {
+  state.activeSheet = idx;
+  renderResults();
+}
+
+// 构建单张板材的 SVG 排版图（屏幕展示与 PDF 导出共用）
+function buildSheetSVG(sheetIdx, maxW, maxH) {
+  const r = state.results;
+  const sheet = r.sheets[sheetIdx];
+
+  const scale = Math.min(maxW / r.sheetW, maxH / r.sheetH);
+  const displayW = r.sheetW * scale;
+  const displayH = r.sheetH * scale;
+
+  // 颜色亮度调整函数
+  function adjustColor(color, amount) {
+    const hex = color.replace('#', '');
+    const cr = Math.max(0, Math.min(255, parseInt(hex.substr(0, 2), 16) + amount));
+    const cg = Math.max(0, Math.min(255, parseInt(hex.substr(2, 2), 16) + amount));
+    const cb = Math.max(0, Math.min(255, parseInt(hex.substr(4, 2), 16) + amount));
+    return `rgb(${cr},${cg},${cb})`;
+  }
+
+  let svgContent = '';
+
+  // 板材背景
+  svgContent += `<rect x="0" y="0" width="${displayW}" height="${displayH}" fill="#f5f5f0" stroke="#888" stroke-width="2"/>`;
+
+  // 网格线（每200mm）
+  const gridStep = 200 * scale;
+  svgContent += '<g opacity="0.15">';
+  for (let x = gridStep; x < displayW; x += gridStep) {
+    svgContent += `<line x1="${x}" y1="0" x2="${x}" y2="${displayH}" stroke="#999" stroke-width="0.5"/>`;
+  }
+  for (let y = gridStep; y < displayH; y += gridStep) {
+    svgContent += `<line x1="0" y1="${y}" x2="${displayW}" y2="${y}" stroke="#999" stroke-width="0.5"/>`;
+  }
+  svgContent += '</g>';
+
+  // 最大连续余料区域高亮（虚线 + 浅绿填充 + 尺寸标注）
+  const freeList = (r.freeRects && r.freeRects[sheetIdx]) ? r.freeRects[sheetIdx] : null;
+  if (freeList && freeList.length > 0) {
+    let maxFree = null;
+    for (const f of freeList) {
+      if (!maxFree || f.w * f.h > maxFree.w * maxFree.h) maxFree = f;
+    }
+    if (maxFree && maxFree.w > 0 && maxFree.h > 0) {
+      const mx = maxFree.x * scale;
+      const my = maxFree.y * scale;
+      const mw = maxFree.w * scale;
+      const mh = maxFree.h * scale;
+      svgContent += `<rect x="${mx}" y="${my}" width="${mw}" height="${mh}"
+        fill="#2e9e5b" fill-opacity="0.07" stroke="#2e9e5b" stroke-width="1.4" stroke-dasharray="7,4"/>`;
+      if (mw > 90 && mh > 42) {
+        svgContent += `<text x="${mx + mw / 2}" y="${my + 15}" text-anchor="middle"
+          fill="#1e7a45" font-size="11" font-weight="600" style="font-family:inherit;">
+          余料 ${Math.round(maxFree.w)}×${Math.round(maxFree.h)} mm
+        </text>`;
+        svgContent += `<text x="${mx + mw / 2}" y="${my + 29}" text-anchor="middle"
+          fill="#1e7a45" font-size="10" style="font-family:inherit;">
+          面积 ${formatArea(maxFree.w * maxFree.h)} m²
+        </text>`;
+      }
+    }
+  }
+
+  // 绘制零件
+  sheet.forEach((p, idx) => {
+    const px = p.x * scale;
+    const py = p.y * scale;
+    const pw = p.w * scale;
+    const ph = p.h * scale;
+
+    const baseColor = p.color;
+
+    svgContent += `<g>`;
+    // 零件矩形
+    svgContent += `<rect x="${px}" y="${py}" width="${pw}" height="${ph}"
+      fill="${baseColor}" fill-opacity="0.7" stroke="${adjustColor(baseColor, -40)}" stroke-width="1.2" rx="1"/>`;
+
+    // 零件编号和尺寸文字
+    const fontSize = Math.min(11, Math.max(8, Math.min(pw, ph) / 6));
+    const textColor = '#fff';
+
+    if (pw > 40 && ph > 30) {
+      // 零件名称
+      svgContent += `<text x="${px + pw / 2}" y="${py + ph / 2 - fontSize * 0.8}"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="${textColor}" font-size="${fontSize}" font-weight="600"
+        style="font-family:inherit; paint-order:stroke; stroke:${adjustColor(baseColor,-60)}; stroke-width:2px;">
+        ${escapeHtml(p.name.length > 8 ? p.name.substr(0, 8) + '..' : p.name)}
+      </text>`;
+      // 尺寸
+      svgContent += `<text x="${px + pw / 2}" y="${py + ph / 2 + fontSize * 0.6}"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="${textColor}" font-size="${fontSize - 1}"
+        style="font-family:inherit; paint-order:stroke; stroke:${adjustColor(baseColor,-60)}; stroke-width:1.5px;">
+        ${Math.round(p.w)}×${Math.round(p.h)}
+      </text>`;
+    } else if (pw > 25 && ph > 20) {
+      svgContent += `<text x="${px + pw / 2}" y="${py + ph / 2}"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="${textColor}" font-size="${fontSize - 1}" font-weight="600"
+        style="font-family:inherit;">
+        ${idx + 1}
+      </text>`;
+    }
+
+    // 旋转标记
+    if (p.rotated && pw > 30 && ph > 25) {
+      svgContent += `<g transform="translate(${px + pw - 12}, ${py + 8})">
+        <circle cx="0" cy="0" r="7" fill="rgba(255,255,255,0.9)"/>
+        <path d="M-3,-1 A3,3 0 1,1 -2,2" fill="none" stroke="${baseColor}" stroke-width="1.2"/>
+        <polygon points="-1,3 -3.5,1.5 0,0.5" fill="${baseColor}"/>
+      </g>`;
+    }
+
+    svgContent += `</g>`;
+  });
+
+  // 尺寸标注（两侧字号统一为 11；文字放在标注线外侧避免重叠）
+  const dimOffset = 70;
+  const dimColor = '#666';
+
+  // 顶部宽度标注
+  svgContent += `<g class="dimension">
+    <line x1="0" y1="${-dimOffset + 32}" x2="${displayW}" y2="${-dimOffset + 32}" stroke="${dimColor}" stroke-width="0.8"/>
+    <line x1="0" y1="${-dimOffset + 28}" x2="0" y2="${-dimOffset + 36}" stroke="${dimColor}" stroke-width="0.8"/>
+    <line x1="${displayW}" y1="${-dimOffset + 28}" x2="${displayW}" y2="${-dimOffset + 36}" stroke="${dimColor}" stroke-width="0.8"/>
+    <text x="${displayW / 2}" y="${-dimOffset + 20}" text-anchor="middle" fill="${dimColor}" font-size="11" style="font-family:inherit;">${r.sheetW} mm</text>
+  </g>`;
+
+  // 左侧高度标注
+  svgContent += `<g class="dimension">
+    <line x1="${-dimOffset + 40}" y1="0" x2="${-dimOffset + 40}" y2="${displayH}" stroke="${dimColor}" stroke-width="0.8"/>
+    <line x1="${-dimOffset + 36}" y1="0" x2="${-dimOffset + 44}" y2="0" stroke="${dimColor}" stroke-width="0.8"/>
+    <line x1="${-dimOffset + 36}" y1="${displayH}" x2="${-dimOffset + 44}" y2="${displayH}" stroke="${dimColor}" stroke-width="0.8"/>
+    <text x="${-dimOffset + 30}" y="${displayH / 2}" text-anchor="middle" fill="${dimColor}" font-size="11"
+      transform="rotate(-90, ${-dimOffset + 30}, ${displayH / 2})" style="font-family:inherit;">${r.sheetH} mm</text>
+  </g>`;
+
+  return `<svg class="board-svg" width="${displayW + dimOffset * 2}" height="${displayH + dimOffset * 2}"
+    viewBox="${-dimOffset} ${-dimOffset} ${displayW + dimOffset * 2} ${displayH + dimOffset * 2}"
+    shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+    ${svgContent}
+  </svg>`;
+}
+
+function renderSheetVisualization() {
+  const area = $('visualizationArea');
+  area.innerHTML = `
+    <div class="board-zoom-wrap">
+      <div class="board-zoom-controls">
+        <button type="button" class="zoom-btn" onclick="zoomBoard(1.25)" title="放大">＋</button>
+        <button type="button" class="zoom-btn" onclick="zoomBoard(0.8)" title="缩小">－</button>
+        <button type="button" class="zoom-btn" onclick="resetBoardZoom()" title="实际大小">1:1</button>
+        <button type="button" class="zoom-btn" onclick="fitBoardZoom()" title="适应窗口">适应</button>
+        <span class="zoom-level" id="zoomLevel">100%</span>
+      </div>
+      <div class="board-zoom-container" id="boardZoomContainer">
+        <div class="board-zoom-inner" id="boardZoomInner">
+          <div class="board-container">
+            ${buildSheetSVG(state.activeSheet, 1400, 900)}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  initBoardZoom();
+}
+
+// ========== 排版图缩放与平移 ==========
+const boardZoom = { scale: 1, tx: 0, ty: 0, dragging: false, startX: 0, startY: 0, startTx: 0, startTy: 0 };
+
+function applyBoardZoom() {
+  const inner = $('boardZoomInner');
+  if (!inner) return;
+  inner.style.transform = 'translate(' + boardZoom.tx + 'px,' + boardZoom.ty + 'px) scale(' + boardZoom.scale + ')';
+  const level = $('zoomLevel');
+  if (level) level.textContent = Math.round(boardZoom.scale * 100) + '%';
+}
+
+// 以容器内坐标 (cx,cy) 为中心缩放；不传则以容器中心为中心
+function zoomBoard(factor, cx, cy) {
+  const container = $('boardZoomContainer');
+  if (!container) return;
+  if (cx === undefined) {
+    cx = container.clientWidth / 2;
+    cy = container.clientHeight / 2;
+  }
+  const newScale = Math.max(0.2, Math.min(10, boardZoom.scale * factor));
+  if (newScale === boardZoom.scale) return;
+  const ratio = newScale / boardZoom.scale;
+  boardZoom.tx = cx - (cx - boardZoom.tx) * ratio;
+  boardZoom.ty = cy - (cy - boardZoom.ty) * ratio;
+  boardZoom.scale = newScale;
+  applyBoardZoom();
+}
+
+function resetBoardZoom() {
+  boardZoom.scale = 1; boardZoom.tx = 0; boardZoom.ty = 0;
+  applyBoardZoom();
+}
+
+function fitBoardZoom() {
+  const container = $('boardZoomContainer');
+  const inner = $('boardZoomInner');
+  if (!container || !inner) return;
+  const cw = container.clientWidth, ch = container.clientHeight;
+  const iw = inner.scrollWidth, ih = inner.scrollHeight;
+  if (!iw || !ih) return;
+  const scale = Math.min(cw / iw, ch / ih) * 0.92;
+  boardZoom.scale = Math.max(0.2, scale);
+  boardZoom.tx = (cw - iw * boardZoom.scale) / 2;
+  boardZoom.ty = (ch - ih * boardZoom.scale) / 2;
+  applyBoardZoom();
+}
+
+function boardZoomOnMove(e) {
+  if (!boardZoom.dragging) return;
+  boardZoom.tx = boardZoom.startTx + (e.clientX - boardZoom.startX);
+  boardZoom.ty = boardZoom.startTy + (e.clientY - boardZoom.startY);
+  applyBoardZoom();
+}
+function boardZoomOnUp() {
+  if (boardZoom.dragging) {
+    boardZoom.dragging = false;
+    const c = $('boardZoomContainer');
+    if (c) c.style.cursor = 'grab';
+  }
+}
+
+function initBoardZoom() {
+  const container = $('boardZoomContainer');
+  if (!container) return;
+  // 每次重新渲染后重置为 1:1
+  boardZoom.scale = 1; boardZoom.tx = 0; boardZoom.ty = 0;
+  applyBoardZoom();
+
+  // 滚轮缩放（以鼠标位置为中心）
+  container.onwheel = function (e) {
+    e.preventDefault();
+    const rect = container.getBoundingClientRect();
+    zoomBoard(e.deltaY > 0 ? 0.9 : 1.1, e.clientX - rect.left, e.clientY - rect.top);
+  };
+
+  // 鼠标拖拽平移
+  container.onmousedown = function (e) {
+    boardZoom.dragging = true;
+    boardZoom.startX = e.clientX; boardZoom.startY = e.clientY;
+    boardZoom.startTx = boardZoom.tx; boardZoom.startTy = boardZoom.ty;
+    container.style.cursor = 'grabbing';
+    e.preventDefault();
+  };
+  document.addEventListener('mousemove', boardZoomOnMove);
+  document.addEventListener('mouseup', boardZoomOnUp);
+
+  // 移动端双指缩放 + 单指平移
+  let touchDist = 0, touchScale = 1, touchMid = { x: 0, y: 0 };
+  let singleTouch = null;
+  container.ontouchstart = function (e) {
+    if (e.touches.length === 2) {
+      singleTouch = null;
+      touchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      touchScale = boardZoom.scale;
+      const rect = container.getBoundingClientRect();
+      touchMid.x = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      touchMid.y = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+    } else if (e.touches.length === 1) {
+      singleTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, tx: boardZoom.tx, ty: boardZoom.ty };
+    }
+  };
+  container.ontouchmove = function (e) {
+    if (e.touches.length === 2 && touchDist > 0) {
+      e.preventDefault();
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const targetScale = Math.max(0.2, Math.min(10, touchScale * dist / touchDist));
+      const ratio = targetScale / boardZoom.scale;
+      boardZoom.tx = touchMid.x - (touchMid.x - boardZoom.tx) * ratio;
+      boardZoom.ty = touchMid.y - (touchMid.y - boardZoom.ty) * ratio;
+      boardZoom.scale = targetScale;
+      applyBoardZoom();
+    } else if (e.touches.length === 1 && singleTouch) {
+      e.preventDefault();
+      boardZoom.tx = singleTouch.tx + (e.touches[0].clientX - singleTouch.x);
+      boardZoom.ty = singleTouch.ty + (e.touches[0].clientY - singleTouch.y);
+      applyBoardZoom();
+    }
+  };
+  container.ontouchend = function () { touchDist = 0; singleTouch = null; };
+
+  // 渲染完成后自动适配窗口：整板完整显示，上下左右留白均匀
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () { fitBoardZoom(); });
+  });
+}
+
+function renderCutList() {
+  const r = state.results;
+  const tbody = $('cutTableBody');
+  let rows = [];
+  let seq = 1;
+
+  r.sheets.forEach((sheet, sheetIdx) => {
+    sheet.forEach(p => {
+      rows.push(`
+        <tr>
+          <td>${seq++}</td>
+          <td><span style="display:inline-block;width:10px;height:10px;background:${p.color};border-radius:2px;margin-right:6px;vertical-align:middle;"></span>${escapeHtml(p.name)}</td>
+          <td class="num">${Math.round(p.w)} × ${Math.round(p.h)}</td>
+          <td>第 ${sheetIdx + 1} 张</td>
+          <td class="num">${Math.round(p.x)}</td>
+          <td class="num">${Math.round(p.y)}</td>
+          <td>${p.rotated ? '<span class="rotated-badge">90°</span>' : '-'}</td>
+          <td class="num">${formatArea(p.w * p.h)}</td>
+        </tr>
+      `);
+    });
+  });
+
+  // 未放置的零件
+  if (r.unplaced && r.unplaced.length > 0) {
+    r.unplaced.forEach(item => {
+      rows.push(`
+        <tr style="background:var(--red-light);">
+          <td>${seq++}</td>
+          <td>${escapeHtml(item.name)}</td>
+          <td class="num">${item.width} × ${item.height}</td>
+          <td colspan="5" style="color:var(--red);">未能放置（板材空间不足）</td>
+        </tr>
+      `);
+    });
+  }
+
+  tbody.innerHTML = rows.join('');
+}
+
+// 折叠/展开切割清单，为排版图腾出更大展示空间
+function toggleCutList() {
+  const panel = $('cutListPanel');
+  if (!panel) return;
+  const collapsed = panel.classList.toggle('collapsed');
+  const btn = $('btnToggleCutList');
+  if (btn) btn.textContent = collapsed ? '展开' : '折叠';
+  // 布局变化后重新适配窗口，让板完整显示
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () { fitBoardZoom(); });
+  });
+}
+
+// ========== 导出功能 ==========
+function exportCSV() {
+  if (!state.results) { showToast('请先执行排版', 'error'); return; }
+
+  const r = state.results;
+  let csv = '\uFEFF'; // BOM for Excel
+  csv += '序号,零件名称,切割尺寸(mm),所在板材,X坐标(mm),Y坐标(mm),旋转,面积(m²)\n';
+
+  let seq = 1;
+  r.sheets.forEach((sheet, sheetIdx) => {
+    sheet.forEach(p => {
+      csv += `${seq++},"${p.name}",${Math.round(p.w)}×${Math.round(p.h)},第${sheetIdx + 1}张,${Math.round(p.x)},${Math.round(p.y)},${p.rotated ? '90°' : ''},${formatArea(p.w * p.h)}\n`;
+    });
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `板材切割清单_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('切割清单已导出', 'success');
+}
+
+/**
+ * 导出 PDF：生成包含全部板材排版图 + 统计 + 切割明细的打印视图，
+ * 通过浏览器打印对话框「另存为 PDF」输出（矢量排版图，清晰无锯齿）。
+ */
+function exportPDF() {
+  if (!state.results) { showToast('请先执行排版', 'error'); return; }
+  const r = state.results;
+
+  let html = '';
+  const kerfVal = parseFloat($('sawKerf').value) || 0;
+  const now = new Date();
+  const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+  html += `<div class="print-header">
+    <h2>专业板材切割排版优化系统</h2>
+    <span class="print-meta">板材 ${r.sheetW} × ${r.sheetH} mm · 锯缝 ${kerfVal} mm · 生成于 ${dateStr}</span>
+  </div>`;
+
+  html += `<div class="print-stats">
+    <span>使用板材 <b>${r.stats.sheetCount}</b> 张</span>
+    <span>零件 <b>${r.stats.totalParts}</b> 件</span>
+    <span>已用面积 <b class="u">${formatArea(r.stats.totalUsed)} m²</b></span>
+  </div>`;
+
+  // 每张板材单独一页
+  r.sheets.forEach((sheet, sheetIdx) => {
+    const usedArea = sheet.reduce((s, p) => s + p.w * p.h, 0);
+    const usage = (usedArea / (r.sheetW * r.sheetH) * 100).toFixed(1);
+
+    let rows = '';
+    sheet.forEach((p, i) => {
+      rows += `<tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td class="num">${Math.round(p.w)} × ${Math.round(p.h)}</td>
+        <td class="num">${Math.round(p.x)}</td>
+        <td class="num">${Math.round(p.y)}</td>
+        <td>${p.rotated ? '90°' : '-'}</td>
+      </tr>`;
+    });
+
+    html += `<div class="print-sheet">
+      <div class="print-sheet-title">第 ${sheetIdx + 1} 张板材</div>
+      <div class="print-svg-wrap">${buildSheetSVG(sheetIdx, 1100, 700)}</div>
+      <table class="print-list">
+        <thead>
+          <tr><th>#</th><th>零件名称</th><th class="num">切割尺寸 (mm)</th><th class="num">X (mm)</th><th class="num">Y (mm)</th><th>旋转</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  });
+
+  // 创建临时打印视图
+  const printArea = document.createElement('div');
+  printArea.id = 'printArea';
+  printArea.className = 'print-area';
+  printArea.innerHTML = html;
+  document.body.appendChild(printArea);
+
+  // 打印完成后清理临时视图
+  const cleanup = () => {
+    if (document.body.contains(printArea)) printArea.remove();
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(cleanup, 60000); // 兜底清理，防止异常情况残留
+
+  showToast('在打印对话框中选择「另存为 PDF」即可导出', 'success');
+  window.print();
+}
+
+// ========== 示例数据 ==========
+function loadDemo() {
+  state.parts = [
+    { id: 1, name: '柜体侧板', width: 600, height: 1800, qty: 2, rotatable: true, color: state.colorPalette[0] },
+    { id: 2, name: '柜体顶板', width: 580, height: 400, qty: 1, rotatable: true, color: state.colorPalette[1] },
+    { id: 3, name: '柜体底板', width: 580, height: 400, qty: 1, rotatable: true, color: state.colorPalette[2] },
+    { id: 4, name: '层板', width: 560, height: 380, qty: 3, rotatable: true, color: state.colorPalette[3] },
+    { id: 5, name: '背板条', width: 50, height: 1780, qty: 4, rotatable: true, color: state.colorPalette[4] },
+    { id: 6, name: '门板', width: 590, height: 890, qty: 2, rotatable: true, color: state.colorPalette[5] },
+    { id: 7, name: '抽屉面板', width: 560, height: 180, qty: 3, rotatable: true, color: state.colorPalette[6] },
+    { id: 8, name: '踢脚板', width: 580, height: 80, qty: 1, rotatable: true, color: state.colorPalette[7] }
+  ];
+  state.nextPartId = 9;
+  $('sheetWidth').value = 2440;
+  $('sheetHeight').value = 1220;
+  $('sawKerf').value = 3;
+  renderPartsList();
+  showToast('已加载衣柜板材示例数据', 'success');
+}
+
+// ========== 板材种类联动 ==========
+function updateSheetTypeUI() {
+  const textured = $('sheetType').value === 'textured';
+  $('partRotatable').disabled = textured;
+  $('partRotatableText').textContent = textured ? '纹理板：方向自动一致' : '允许90°旋转';
+  $('sheetTypeHint').style.display = textured ? 'block' : 'none';
+  if (textured) $('partRotatable').checked = true;
+  renderPartsList();
+}
+
+// ========== 移动端视图切换 ==========
+function setMobileView(view) {
+  const main = document.querySelector('.main');
+  if (!main) return;
+  main.classList.toggle('show-result', view === 'result');
+  document.querySelectorAll('.mob-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('data-view') === view);
+  });
+}
+
+// ========== 历史方案（localStorage 本地持久化，数据不跨设备） ==========
+const PLANS_KEY = 'cuttingOptimizer_plans_v1';
+let savedPlans = [];
+
+function loadPlans() {
+  try { savedPlans = JSON.parse(localStorage.getItem(PLANS_KEY)); }
+  catch (e) { savedPlans = null; }
+  if (!Array.isArray(savedPlans)) savedPlans = [];
+}
+
+function persistPlans() {
+  let ok = true;
+  try {
+    localStorage.setItem(PLANS_KEY, JSON.stringify(savedPlans));
+  } catch (e) {
+    ok = false;
+  }
+  // 无论存储是否成功，都先同步列表（反映内存中的最新状态）
+  renderPlans();
+  return ok;
+}
+
+// 收集当前输入为方案快照
+function collectPlanData() {
+  return {
+    sheetW: $('sheetWidth').value,
+    sheetH: $('sheetHeight').value,
+    kerf: $('sawKerf').value,
+    sheetCount: $('sheetCount').value,
+    sheetType: $('sheetType').value,
+    strategy: $('strategySelect').value,
+    parts: state.parts.map(p => Object.assign({}, p))
+  };
+}
+
+// 应用方案快照：恢复输入并自动重算
+function applyPlanData(d) {
+  if (!d || !d.parts) return;
+  $('sheetWidth').value = d.sheetW;
+  $('sheetHeight').value = d.sheetH;
+  $('sawKerf').value = d.kerf;
+  $('sheetCount').value = d.sheetCount;
+  if (d.sheetType) $('sheetType').value = d.sheetType;
+  if (d.strategy) $('strategySelect').value = d.strategy;
+  state.parts = d.parts.map(p => Object.assign({}, p));
+  state.nextPartId = state.parts.reduce((m, p) => Math.max(m, p.id + 1), 1);
+  state.editingId = null;
+  state.editingQtyId = null;
+  updateSheetTypeUI();
+  renderPartsList();
+  runOptimization();
+}
+
+function formatTime(ts) {
+  const dt = new Date(ts);
+  const pad = n => String(n).padStart(2, '0');
+  return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()) + ' ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes());
+}
+
+function renderPlans() {
+  const list = $('planList');
+  $('planCount').textContent = '(' + savedPlans.length + ')';
+  if (savedPlans.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-text">暂无保存的方案<br>输入方案后点右上角「保存方案」</div></div>';
+    return;
+  }
+  // 按保存时间倒序
+  const sorted = savedPlans.slice().sort((a, b) => b.savedAt - a.savedAt);
+  list.innerHTML = sorted.map(p => {
+    const partCount = p.data.parts.reduce((s, x) => s + x.qty, 0);
+    return `
+    <div class="plan-item">
+      <div class="plan-info">
+        <div class="plan-name" onclick="loadPlan('${p.id}')" title="点击加载该方案">${escapeHtml(p.name)}</div>
+        <div class="plan-meta">${formatTime(p.savedAt)} · ${p.data.parts.length} 种 / ${partCount} 件</div>
+      </div>
+      <div class="plan-actions">
+        <button class="icon-btn" onclick="renamePlan('${p.id}')" title="重命名">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="icon-btn danger" onclick="deletePlan('${p.id}')" title="删除">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 保存/删除类操作的统一提示：区分“已生效”与“存储不可用”
+function planToast(ok, okMsg) {
+  showToast(ok ? okMsg : (okMsg + '（本次会话已生效，但浏览器本地存储不可用，刷新后可能丢失）'), ok ? 'success' : 'error');
+}
+
+// 保存当前方案（可命名；同名则覆盖）
+function saveCurrentPlan() {
+  if (state.parts.length === 0) { showToast('请先添加零件再保存方案', 'error'); return; }
+  showPrompt('保存方案', '输入方案名称（便于日后查找）', '方案 ' + (savedPlans.length + 1), (name) => {
+    name = (name || '').trim();
+    if (!name) { showToast('方案名称不能为空', 'error'); return; }
+    const existed = savedPlans.find(p => p.name === name);
+    if (existed) {
+      showConfirm(`已存在同名方案「${name}」，确定覆盖吗？`, () => {
+        existed.data = collectPlanData();
+        existed.savedAt = Date.now();
+        planToast(persistPlans(), '方案已更新：' + name);
+      }, '覆盖方案');
+      return;
+    }
+    savedPlans.push({
+      id: 'p' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
+      name,
+      savedAt: Date.now(),
+      data: collectPlanData()
+    });
+    planToast(persistPlans(), '方案已保存：' + name);
+  });
+}
+
+function loadPlan(id) {
+  const p = savedPlans.find(x => x.id === id);
+  if (!p) return;
+  applyPlanData(p.data);
+  showToast('已加载方案：' + p.name, 'success');
+}
+
+function renamePlan(id) {
+  const p = savedPlans.find(x => x.id === id);
+  if (!p) return;
+  showPrompt('重命名方案', '输入新的方案名称', p.name, (name) => {
+    name = (name || '').trim();
+    if (!name) { showToast('方案名称不能为空', 'error'); return; }
+    if (savedPlans.some(x => x.id !== id && x.name === name)) {
+      showToast('已存在同名方案', 'error');
+      return;
+    }
+    p.name = name;
+    planToast(persistPlans(), '方案已重命名');
+  });
+}
+
+function deletePlan(id) {
+  const p = savedPlans.find(x => x.id === id);
+  if (!p) return;
+  showConfirm(`确定删除方案「${p.name}」吗？此操作不可撤销。`, () => {
+    savedPlans = savedPlans.filter(x => x.id !== id);
+    planToast(persistPlans(), '方案已删除');
+  }, '删除方案');
+}
+
+function clearPlans() {
+  if (savedPlans.length === 0) { showToast('暂无保存的方案'); return; }
+  showConfirm(`确定清空全部 ${savedPlans.length} 个历史方案吗？此操作不可撤销。`, () => {
+    savedPlans = [];
+    planToast(persistPlans(), '历史方案已清空');
+  }, '清空历史');
+}
+
+// ========== 命名输入弹窗 ==========
+let promptCallback = null;
+
+function showPrompt(title, placeholder, defaultValue, onConfirm) {
+  $('promptTitle').textContent = title || '方案命名';
+  $('promptInput').placeholder = placeholder || '';
+  $('promptInput').value = defaultValue || '';
+  promptCallback = onConfirm;
+  $('promptModal').classList.add('show');
+  setTimeout(() => { $('promptInput').focus(); $('promptInput').select(); }, 0);
+}
+
+function hidePrompt() {
+  $('promptModal').classList.remove('show');
+  promptCallback = null;
+}
+
+function onPromptOk() {
+  const cb = promptCallback;
+  hidePrompt();
+  if (cb) cb($('promptInput').value);
+}
+
+// ========== 自定义确认弹窗（替代原生 confirm） ==========
+let confirmCallback = null;
+
+function showConfirm(message, onConfirm, title) {
+  $('confirmTitle').textContent = title || '确认操作';
+  $('confirmMessage').textContent = message;
+  confirmCallback = onConfirm;
+  $('confirmModal').classList.add('show');
+}
+
+function hideConfirm() {
+  $('confirmModal').classList.remove('show');
+  confirmCallback = null;
+}
+
+function clearAll() {
+  if (state.parts.length === 0 && !state.results) {
+    showToast('当前没有数据需要清空');
+    return;
+  }
+  showConfirm('确定要清空所有零件和排版结果吗？此操作不可撤销。', () => {
+    state.parts = [];
+    state.results = null;
+    state.nextPartId = 1;
+    state.editingId = null;
+    state.editingQtyId = null;
+    renderPartsList();
+    $('statsBar').style.display = 'none';
+    $('sheetsTabs').style.display = 'none';
+    $('cutListPanel').style.display = 'none';
+    $('visualizationArea').innerHTML = `
+      <div class="result-placeholder">
+        <div class="result-placeholder-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+            <rect x="2" y="2" width="20" height="20" rx="2"/>
+            <rect x="4" y="4" width="8" height="6" rx="1"/>
+            <rect x="14" y="4" width="6" height="4" rx="1"/>
+            <rect x="4" y="12" width="5" height="8" rx="1"/>
+            <rect x="11" y="10" width="9" height="10" rx="1"/>
+          </svg>
+        </div>
+        <div class="result-placeholder-title">等待排版计算</div>
+        <div class="result-placeholder-desc">在左侧设置原材料尺寸，添加需要切割的零件清单，然后点击「开始排版」按钮，系统将自动计算最优切割方案。</div>
+      </div>`;
+    showToast('数据已清空', 'success');
+  }, '清空数据');
+}
+
+// ========== 事件绑定 ==========
+function initEvents() {
+  $('btnAddPart').addEventListener('click', addPart);
+  $('btnOptimize').addEventListener('click', runOptimization);
+  $('btnClearAll').addEventListener('click', clearAll);
+  $('btnExportCSV').addEventListener('click', exportCSV);
+  $('btnExportPDF').addEventListener('click', exportPDF);
+  $('btnToggleCutList').addEventListener('click', toggleCutList);
+  $('btnSavePlan').addEventListener('click', saveCurrentPlan);
+  $('btnClearPlans').addEventListener('click', clearPlans);
+  $('sheetType').addEventListener('change', updateSheetTypeUI);
+
+  // 确认弹窗按钮
+  $('confirmOk').addEventListener('click', () => {
+    const cb = confirmCallback;
+    hideConfirm();
+    if (cb) cb();
+  });
+  $('confirmCancel').addEventListener('click', hideConfirm);
+  $('confirmMask').addEventListener('click', hideConfirm);
+
+  // 命名输入弹窗按钮
+  $('promptOk').addEventListener('click', onPromptOk);
+  $('promptCancel').addEventListener('click', hidePrompt);
+  $('promptMask').addEventListener('click', hidePrompt);
+  $('promptInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') onPromptOk();
+    if (e.key === 'Escape') hidePrompt();
+  });
+
+  // 批量导入弹窗
+  $('importMask').addEventListener('click', closeImportModal);
+  $('importText').addEventListener('input', updateImportPreview);
+  $('importText').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeImportModal();
+  });
+
+  // 移动端视图切换
+  document.querySelectorAll('.mob-tab').forEach(t => {
+    t.addEventListener('click', () => setMobileView(t.getAttribute('data-view')));
+  });
+
+  // 回车添加零件
+  ['partName', 'partWidth', 'partHeight', 'partQty'].forEach(id => {
+    $(id).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addPart();
+    });
+  });
+}
+
+// ========== 初始化 ==========
+initEvents();
+renderPartsList();
+loadPlans();
+renderPlans();
+updateSheetTypeUI();
+</script>
+</body>
+</html>

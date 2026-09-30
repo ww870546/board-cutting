@@ -1428,7 +1428,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.38</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.39</span>
     </div>
 
     <!-- 历史方案 -->
@@ -2552,8 +2552,8 @@ function ocrMedian(arr) {
 function classifyOcrHeader(text) {
   const t = String(text || '').trim();
   if (!t || /\d/.test(t)) return null;
-  if (/数量|张数|片数|件数|个数|^数$/.test(t)) return 'qty';
-  if (/规格|尺寸/.test(t)) return 'size';
+  if (/数量|张数|片数|件数|个数|条数|套数|只数|^数$|^张$|^块$|^片$|^件$|^个$|^条$|^套$|^只$|qty|pcs/i.test(t)) return 'qty';
+  if (/规格|尺寸|高\s*[×xX*＊]\s*宽|宽\s*[×xX*＊]\s*高|^高宽$|^宽高$/.test(t)) return 'size';
   if (/名称|零件名|品名|^名$/.test(t)) return 'name';
   if (/图号|^图$|编号|序号|^序$|^no\.?$/i.test(t)) return 'index';
   if (/厚度|^厚$/.test(t)) return 'skip';
@@ -2918,7 +2918,7 @@ function runImageOcr() {
       datas.push(r.data);
     }
     // 合并 words（数字 + 表头列名，按文本+粗略位置去重），还原坐标到原图
-    const OCR_HDR_RE = /宽度|^宽$|长度|^长$|高度|^高$|深度|^深$|数量|张数|片数|件数|个数|^数$|图号|^图$|序号|^序$|编号|厚度|^厚$|备注|^注$|^备$|说明|打孔|钻孔|开孔|孔径|孔数|^孔$|^打$|名称|零件名|品名|^名$|规格|尺寸/;
+    const OCR_HDR_RE = /宽度|^宽$|长度|^长$|高度|^高$|深度|^深$|数量|张数|片数|件数|个数|条数|套数|只数|^数$|^张$|^块$|^片$|^件$|^个$|^条$|^套$|^只$|[qQ][tT][yY]|[pP][cC][sS]|图号|^图$|序号|^序$|编号|厚度|^厚$|备注|^注$|^备$|说明|打孔|钻孔|开孔|孔径|孔数|^孔$|^打$|名称|零件名|品名|^名$|规格|尺寸|高[×xX*＊]宽|宽[×xX*＊]高|高宽|宽高/;
     const merged = new Map();
     for (const data of datas) {
       for (const w of (data.words || [])) {

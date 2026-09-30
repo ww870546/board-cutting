@@ -1012,6 +1012,19 @@ select.form-input {
   cursor: pointer;
 }
 .pv-del:hover { background: #fde8e8; color: #d9534f; }
+/* 手动补录行：识别漏行时对着原图新增，浅色高亮便于核对 */
+.pv-add-wrap { margin-top: 8px; }
+.pv-add-btn, .lb-add-btn {
+  width: 100%; box-sizing: border-box; padding: 7px 8px;
+  border: 1px dashed var(--accent); background: #fff; color: var(--accent);
+  border-radius: 6px; font-size: 12.5px; cursor: pointer;
+}
+.pv-add-btn:hover, .lb-add-btn:hover { background: #fff6ec; }
+tr.pv-manual td { background: #fff7ec; }
+tr.pv-manual .pv-input { background: #fffdf8; }
+.lb-add-wrap { margin-top: 6px; }
+.lb-add-btn { padding: 5px 8px; font-size: 12px; }
+tr.lb-manual td { background: #fff7ec; }
 @media (max-width: 768px) {
   .import-box { width: 92vw; }
   .pv-input { width: 54px; }
@@ -1415,7 +1428,7 @@ select.form-input {
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.34</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.35</span>
     </div>
 
     <!-- 历史方案 -->
@@ -2070,8 +2083,36 @@ function renderPreviewTable(list, noteText, mergedKeys) {
     </tr>`;
   }
   html += '</table>';
+  html += '<div class="pv-add-wrap"><button type="button" class="pv-add-btn" onclick="addPreviewRow()">＋ 添加一行（对着图补录漏识别的零件）</button></div>';
   body.innerHTML = html;
-  note.textContent = noteText || '识别有误的可直接在表格中修改或删除，然后点「导入」';
+  note.textContent = noteText || '识别有误的可直接在表格中修改、删除，或点下方「添加一行」补录，然后点「导入」';
+}
+
+/** 刷新预览行数统计（按表格中实际行数，所见即所得） */
+function updatePreviewCount(noteText) {
+  const n = document.querySelectorAll('#importPreviewBody table tr[data-row]').length;
+  $('importPreviewCount').textContent = n ? `（${n} 行）` : '';
+  if (noteText !== undefined) $('importPreviewNote').textContent = noteText;
+}
+
+/** 手动添加一行空白零件（识别漏行时对着原图当场补录；数量留空默认 1，长宽为空导入时自动忽略） */
+function addPreviewRow() {
+  const table = document.querySelector('#importPreviewBody table');
+  if (!table) return;
+  const tr = document.createElement('tr');
+  tr.setAttribute('data-row', '');
+  tr.className = 'pv-manual';
+  tr.innerHTML =
+    '<td><input type="text" class="pv-input pv-name" placeholder="自动编号"></td>' +
+    '<td><input type="number" class="pv-input pv-w" min="1" step="1" placeholder="长"></td>' +
+    '<td><input type="number" class="pv-input pv-h" min="1" step="1" placeholder="宽"></td>' +
+    '<td><input type="number" class="pv-input pv-q" min="1" step="1" placeholder="1"></td>' +
+    '<td><button type="button" class="pv-del" onclick="deletePreviewRow(this)" title="删除此行">×</button></td>';
+  const tb = table.querySelector('tbody') || table;
+  tb.appendChild(tr);
+  updatePreviewCount('已新增一行，请填入长、宽（数量留空按 1）；长宽留空的行导入时自动忽略');
+  const w = tr.querySelector('.pv-w');
+  if (w) { w.focus(); tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
 }
 
 /** 删除预览中的一行 */
@@ -2079,11 +2120,11 @@ function deletePreviewRow(btn) {
   const tr = btn.closest('tr[data-row]');
   if (!tr) return;
   tr.remove();
-  const list = readPreviewRows();
-  $('importPreviewCount').textContent = `（${list.length} 行）`;
+  const n = document.querySelectorAll('#importPreviewBody table tr[data-row]').length;
+  $('importPreviewCount').textContent = n ? `（${n} 行）` : '';
   const note = $('importPreviewNote');
-  note.textContent = list.length > 0 ? `已删除，剩余 ${list.length} 行。确认后点「导入」` : '已全部删除，可重新粘贴数据';
-  if (list.length === 0) {
+  note.textContent = n > 0 ? `已删除，剩余 ${n} 行。确认后点「导入」` : '已全部删除，可重新粘贴数据';
+  if (n === 0) {
     $('importPreviewBody').innerHTML = '';
   }
 }
@@ -2143,8 +2184,8 @@ function readPreviewRows() {
     const name = tr.querySelector('.pv-name').value.trim();
     const width = parseFloat(tr.querySelector('.pv-w').value);
     const height = parseFloat(tr.querySelector('.pv-h').value);
-    const qty = parseInt(tr.querySelector('.pv-q').value, 10);
-    if (width > 0 && height > 0 && qty > 0) {
+    const qty = parseInt(tr.querySelector('.pv-q').value, 10) || 1; // 数量留空默认 1
+    if (width > 0 && height > 0) {
       rows.push({ name, width, height, qty });
     }
   }
@@ -2364,7 +2405,27 @@ function renderLbEditable() {
     </tr>`;
   });
   h += '</table>';
+  h += '<div class="lb-add-wrap"><button type="button" class="lb-add-btn" onclick="addLbRow()">＋ 添加一行（对着原图补录漏识别的零件）</button></div>';
   box.innerHTML = h;
+}
+/** 灯箱内手动添加一行（对着原图补录；数量留空按 1，长宽为空关闭时自动忽略） */
+function addLbRow() {
+  const box = $('ocrLbSummary');
+  if (!box) return;
+  const table = box.querySelector('table');
+  if (!table) return;
+  const tr = document.createElement('tr');
+  tr.setAttribute('data-i', '');
+  tr.className = 'lb-manual';
+  tr.innerHTML =
+    '<td><input class="lb-input lb-name" placeholder="自动编号"></td>' +
+    '<td><input type="number" class="lb-input lb-w" min="1" step="1" placeholder="长"></td>' +
+    '<td><input type="number" class="lb-input lb-h" min="1" step="1" placeholder="宽"></td>' +
+    '<td><input type="number" class="lb-input lb-q" min="1" step="1" placeholder="1"></td>';
+  const tb = table.querySelector('tbody') || table;
+  tb.appendChild(tr);
+  const w = tr.querySelector('.lb-w');
+  if (w) { w.focus(); tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
 }
 /** 读取灯箱内可编辑表格的数据 */
 function readLbRows() {

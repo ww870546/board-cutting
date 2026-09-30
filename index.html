@@ -1428,7 +1428,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.37</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.38</span>
     </div>
 
     <!-- 历史方案 -->
@@ -2676,6 +2676,41 @@ function parseOcrTable(words) {
     else if (role[ci] === 'height') hc = ci;
     else if (role[ci] === 'size') sizeCi = ci;
   }
+
+  // ③-b 规格合体列（表头"规格/尺寸"，值如 "1200*800" 一列；可能是整词，也可能被 OCR 拆成相邻两个数字列）
+  //     在按两列挑尺寸之前优先处理，避免合体规格里的两个数被误当成"宽列/长列"。
+  if (!(wc >= 0 && hc >= 0) && sizeCi >= 0) {
+    const freeLike = ci => role[ci] === '?' || role[ci] === 'empty';
+    let lo = sizeCi, hi = sizeCi;
+    while (lo - 1 >= 0 && freeLike(lo - 1)) lo--;        // 向左纳入被拆开的相邻数字列
+    while (hi + 1 < centers.length && freeLike(hi + 1)) hi++; // 向右同理，遇到序号/数量/打孔列即止
+    let sqc = -1;                                        // 规格模式下的数量列（在覆盖区间之外）
+    for (let ci = 0; ci < centers.length; ci++) if (role[ci] === 'qty') { sqc = ci; break; }
+    if (sqc < 0) {
+      const cands = [];
+      for (let ci = 0; ci < centers.length; ci++) {
+        if (ci >= lo && ci <= hi) continue;
+        const s = st[ci];
+        if (s.empty || role[ci] === 'index' || role[ci] === 'skip' || role[ci] === 'name') continue;
+        if (s.allInt && s.max <= 2000 && s.coverRatio >= 0.5) cands.push(ci);
+      }
+      cands.sort((a, b) => (st[b].cover - st[a].cover) || (st[a].avg - st[b].avg));
+      if (cands.length) sqc = cands[0];
+    }
+    const sparts = [];
+    for (let r = 0; r < nrows; r++) {
+      const ns = [];
+      for (let ci = lo; ci <= hi; ci++) extractNums(cells[r][ci] || '').forEach(v => { if (v >= 10) ns.push(v); });
+      const width = ns[0] || 0, height = ns[1] || 0;    // 按书写顺序：第一个=宽、第二个=长（排版可旋转，互换不影响利用率）
+      if (width < 10 || height < 10) continue;          // 空行 / 合计行 / 表头残行
+      let qty = sqc >= 0 ? Math.round(firstNum(cells[r][sqc] || '')) : 0;
+      if (!(qty > 0)) qty = 1;
+      sparts.push({ name: '', width, height, qty });
+    }
+    if (sparts.length >= 2) return sparts;
+    // 规格列凑不齐两个尺寸时，继续走下面的两列/统计兜底
+  }
+
   const dimPool = [];
   for (let ci = 0; ci < centers.length; ci++) {
     const s = st[ci];

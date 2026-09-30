@@ -1428,7 +1428,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.35</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.36</span>
     </div>
 
     <!-- 历史方案 -->
@@ -2539,14 +2539,150 @@ function wordsToCells(lines, centers) {
   });
 }
 
+// ---------- OCR 表头识别（清晰表格截图：用表头文字的 x 坐标精确定位列） ----------
+
+function ocrMedian(arr) {
+  const a = arr.slice().sort((x, y) => x - y);
+  const n = a.length;
+  if (n === 0) return 0;
+  return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2;
+}
+
+/** 表头文字 → 列角色；返回 null 表示不是列标签 */
+function classifyOcrHeader(text) {
+  const t = String(text || '').trim();
+  if (!t || /\d/.test(t)) return null;
+  if (/数量|张数|片数|件数|个数|^数$/.test(t)) return 'qty';
+  if (/规格|尺寸/.test(t)) return 'size';
+  if (/名称|零件名|品名|^名$/.test(t)) return 'name';
+  if (/图号|^图$|编号|序号|^序$|^no\.?$/i.test(t)) return 'index';
+  if (/厚度|^厚$/.test(t)) return 'skip';
+  if (/打孔|钻孔|开孔|孔径|孔数|^孔$/.test(t)) return 'skip';
+  if (/备注|^注$|说明/.test(t)) return 'skip';
+  if (/长度|^长$|高度|^高$|深度|^深$/.test(t)) return 'height';
+  if (/宽度|^宽$/.test(t)) return 'width';
+  return null;
+}
+
 /**
- * OCR 表格解析：适用于多行多列的表格截图（如 Excel 表格截图）。
- * 按 x 坐标对齐列（容忍某行丢字导致的错位），再按列语义识别：
- * 序号列（递增）→ 跳过；厚度/状态列（取值种类少且值小）→ 跳过；
- * 剩余列按均值排序：最大=宽、次大=高、最小=数量。
- * 非表格（标注图）返回 null，由调用方退回常规解析。
+ * 检测表头行并返回列锚点（角色 + x 中心）。
+ * 以"宽/长/数量"等只可能出现在表头的词锁定表头行 y，再收拢同一行的所有列标签。
  */
-function parseOcrTable(words) {
+function detectOcrHeaderCols(words) {
+  const labels = [];
+  for (const w of words) {
+    const role = classifyOcrHeader(w.text);
+    if (!role) continue;
+    labels.push({
+      role,
+      text: String(w.text).trim(),
+      cx: (w.bbox.x0 + w.bbox.x1) / 2,
+      cy: (w.bbox.y0 + w.bbox.y1) / 2,
+      h: Math.max(8, w.bbox.y1 - w.bbox.y0)
+    });
+  }
+  if (labels.length < 2) return null;
+  const anchors = labels.filter(l => l.role === 'width' || l.role === 'height' || l.role === 'qty' || l.role === 'size');
+  if (anchors.length === 0) return null;
+  const y0 = ocrMedian(anchors.map(l => l.cy));
+  const rowH = ocrMedian(labels.map(l => l.h)) * 1.8;
+  const head = labels.filter(l => Math.abs(l.cy - y0) <= rowH);
+  if (head.length < 2) return null;
+  // 同角色碎词（如"长度"拆成"长/度"）只保留最靠左的那个
+  const picked = {};
+  for (const l of head.slice().sort((a, b) => a.cx - b.cx)) {
+    if (picked[l.role] === undefined) picked[l.role] = l.cx;
+  }
+  const list = Object.keys(picked).map(role => ({ role, x: picked[role] })).sort((a, b) => a.x - b.x);
+  return { anchors: list, y0, rowH };
+}
+
+/** 有明确表头时：数字词按 x 归到最近的表头列，严格按列语义提取 */
+function parseOcrTableByHeader(words, hdr) {
+  const anchors = hdr.anchors;
+  const xs = anchors.map(a => a.x);
+  const gaps = [];
+  for (let i = 1; i < xs.length; i++) gaps.push(xs[i] - xs[i - 1]);
+  const gap = gaps.length ? ocrMedian(gaps) : 80;
+  const maxDist = gap * 0.8;
+
+  const nums = [];
+  for (const w of words) {
+    if (!/\d/.test(w.text)) continue;
+    const cy = (w.bbox.y0 + w.bbox.y1) / 2;
+    if (Math.abs(cy - hdr.y0) <= hdr.rowH * 0.7) continue; // 排除表头行里的数字
+    const cx = (w.bbox.x0 + w.bbox.x1) / 2;
+    let bi = -1, bd = Infinity;
+    for (let i = 0; i < anchors.length; i++) {
+      const d = Math.abs(cx - anchors[i].x);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    w._role = (bi >= 0 && bd <= maxDist) ? anchors[bi].role : 'free';
+    w._cx = cx; w._cy = cy;
+    nums.push(w);
+  }
+
+  const lines = groupWordsByLine(nums);
+
+  // "数量"表头没被认出时：找覆盖率高、全为小整数的游离竖列当数量列（打孔列稀疏不会被误选）
+  let qtyFreeX = null;
+  const free = nums.filter(w => w._role === 'free');
+  if (free.length >= Math.max(4, lines.length * 0.5)) {
+    const fxs = free.map(w => w._cx).sort((a, b) => a - b);
+    const fcenters = [];
+    for (const x of fxs) { if (!fcenters.length || x - fcenters[fcenters.length - 1] > 40) fcenters.push(x); }
+    let best = null;
+    for (const fx of fcenters) {
+      const col = free.filter(w => Math.abs(w._cx - fx) <= 34);
+      const cover = groupWordsByLine(col).length;
+      const vals = col.map(w => firstNum(w.text)).filter(v => v > 0);
+      const allInt = vals.every(v => Number.isInteger(v));
+      const mx = vals.length ? Math.max(...vals) : 0;
+      if (allInt && mx >= 1 && mx <= 200 && cover >= lines.length * 0.5) {
+        if (!best || cover > best.cover) best = { x: fx, cover };
+      }
+    }
+    if (best) qtyFreeX = best.x;
+  }
+
+  const parts = [];
+  for (const line of lines) {
+    let width = 0, height = 0, qty = 0;
+    const sizeText = [];
+    const dimFree = [];
+    for (const w of line) {
+      const n = firstNum(w.text);
+      switch (w._role) {
+        case 'width': if (!width && n > 0) width = n; break;
+        case 'height': if (!height && n > 0) height = n; break;
+        case 'qty': if (!(qty > 0) && n > 0) qty = n; break;
+        case 'size': sizeText.push(w.text); break;
+        case 'free':
+          if (qtyFreeX !== null && Math.abs(w._cx - qtyFreeX) <= 34) { if (!(qty > 0) && n > 0) qty = n; }
+          else if (n > 0) dimFree.push(n);
+          break;
+        default: break; // index / skip 列（图号、序号、打孔、厚度、备注）忽略
+      }
+    }
+    if (sizeText.length) {
+      const ns = extractNums(sizeText.join(' '));
+      if (ns.length >= 2) { if (!width) width = ns[0]; if (!height) height = ns[1]; }
+    }
+    // 表头漏识别某尺寸列时，用剩余游离数字兜底（大值优先作尺寸）
+    if (width <= 0 || height <= 0) {
+      dimFree.sort((a, b) => b - a);
+      if (width <= 0 && dimFree.length) width = dimFree.shift();
+      if (height <= 0 && dimFree.length) height = dimFree.shift();
+    }
+    if (width < 10 || height < 10) continue; // 非零件数据行（空行/统计行）
+    if (!(qty > 0)) qty = 1;                 // 数量列空白默认 1，不丢行
+    parts.push({ name: '', width, height, qty: Math.round(qty) });
+  }
+  return parts;
+}
+
+/** 无表头时的统计兜底：鲁棒识别编号列（序号/图号），避免把编号当数量 */
+function parseOcrTableByStats(words) {
   const numWords = words.filter(w => /\d/.test(w.text));
   if (numWords.length < 8) return null;
   const lines = groupWordsByLine(numWords);
@@ -2556,44 +2692,67 @@ function parseOcrTable(words) {
   const cells = wordsToCells(lines, centers);
   if (cells.length < 2) return null;
 
-  const colStats = centers.map((_, ci) => {
+  const stats = centers.map((_, ci) => {
     const vals = [];
-    for (const row of cells) {
-      const v = firstNum(row[ci] || '');
-      if (v > 0) vals.push(v);
-    }
+    for (const row of cells) { const v = firstNum(row[ci] || ''); if (v > 0) vals.push(v); }
     if (vals.length < 2) return { ci, empty: true };
-    let increasing = true;
-    for (let i = 1; i < vals.length; i++) if (vals[i] !== vals[i - 1] + 1) { increasing = false; break; }
+    const allInt = vals.every(v => Number.isInteger(v));
+    let strictInc = true;
+    for (let i = 1; i < vals.length; i++) if (vals[i] !== vals[i - 1] + 1) { strictInc = false; break; }
+    const uv = [...new Set(vals)].sort((a, b) => a - b);
+    let consec = 0;
+    for (let i = 1; i < uv.length; i++) if (uv[i] - uv[i - 1] <= 2) consec++;
+    const consecRatio = uv.length > 1 ? consec / (uv.length - 1) : 1;
+    let mono = 0;
+    for (let i = 1; i < vals.length; i++) if (vals[i] >= vals[i - 1]) mono++;
+    const monoRatio = vals.length > 1 ? mono / (vals.length - 1) : 1;
     const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
-    const max = Math.max(...vals);
-    const uniqueCount = new Set(vals).size;
-    return { ci, empty: false, increasing, avg, max, uniqueCount };
+    const max = Math.max(...vals), min = Math.min(...vals), uniqueCount = new Set(vals).size;
+    // 编号列（序号/图号）：全整数、从 1 起、严格递增，或高度单调不减且取值近似连续 1..N
+    const isIndex = allInt && min >= 1 && max <= Math.max(cells.length + 2, 60) &&
+      (strictInc || (monoRatio >= 0.8 && consecRatio >= 0.6));
+    return { ci, empty: false, allInt, isIndex, avg, max, min, uniqueCount };
   });
 
-  let sem = colStats.filter(c => !c.empty);
-  sem = sem.filter(c => !c.increasing);                      // 排除序号列
-  sem = sem.filter(c => !(c.uniqueCount <= 3 && c.max <= 40)); // 排除厚度/状态列
+  let sem = stats.filter(c => !c.empty && !c.isIndex);                        // 排除序号/图号
+  sem = sem.filter(c => !(c.uniqueCount <= 3 && c.max <= 40));               // 排除厚度/状态列
   sem.sort((a, b) => b.avg - a.avg);
+  const dims = sem.filter(c => c.avg >= 40).slice(0, 2).sort((a, b) => a.ci - b.ci); // 均值最大两列=尺寸，左列=宽、右列=长
+  const rest = sem.filter(c => !dims.includes(c));
+  rest.sort((a, b) => a.avg - b.avg);
+  const qcol = rest.find(c => c.allInt && c.max <= 2000) || rest[0];         // 小整数列=数量
 
   const parts = [];
-  if (sem.length >= 3) {
-    const wc = sem[0].ci, hc = sem[1].ci, qc = sem[2].ci;
+  if (dims.length >= 2) {
+    const wc = dims[0].ci, hc = dims[1].ci;
     for (const row of cells) {
       const width = firstNum(row[wc] || '');
       const height = firstNum(row[hc] || '');
-      const qty = Math.round(firstNum(row[qc] || ''));
-      if (width >= 10 && height >= 10 && qty > 0) parts.push({ name: '', width, height, qty });
+      let qty = qcol ? Math.round(firstNum(row[qcol.ci] || '')) : 0;
+      if (width >= 10 && height >= 10) { if (!(qty > 0)) qty = 1; parts.push({ name: '', width, height, qty }); }
     }
-  } else if (sem.length === 2) {
-    const wc = sem[0].ci, hc = sem[1].ci;
+  } else if (dims.length === 1) {
+    const wc = dims[0].ci;
     for (const row of cells) {
       const width = firstNum(row[wc] || '');
-      const height = firstNum(row[hc] || '');
-      if (width >= 10 && height >= 10) parts.push({ name: '', width, height, qty: 1 });
+      if (width >= 10) parts.push({ name: '', width, height: width, qty: 1 });
     }
   }
   return parts.length > 0 ? parts : null;
+}
+
+/**
+ * OCR 表格解析（多行多列表格截图，如 Excel 截图）。
+ * 优先用表头文字 x 坐标精确定位列；识别不到表头时退回列统计（鲁棒排除编号列）。
+ * 数量列空白默认 1，不再因取不到数量而丢行；非表格返回 null，交调用方退回其他解析。
+ */
+function parseOcrTable(words) {
+  const hdr = detectOcrHeaderCols(words);
+  if (hdr && hdr.anchors.some(a => a.role === 'width' || a.role === 'height' || a.role === 'size')) {
+    const byHeader = parseOcrTableByHeader(words, hdr);
+    if (byHeader && byHeader.length >= 2) return byHeader;
+  }
+  return parseOcrTableByStats(words);
 }
 
 /**
@@ -2675,6 +2834,7 @@ function drawOcrBoxes(words) {
   const sy = ih / img.naturalHeight;
   ctx.clearRect(0, 0, iw, ih);
   for (const w of words) {
+    if (!/\d/.test(w.text)) continue; // 表头列名仅用于定位列，不画框
     const b = w.bbox;
     const x = b.x0 * sx, y = b.y0 * sy, wpx = (b.x1 - b.x0) * sx, hpx = (b.y1 - b.y0) * sy;
     const low = w.confidence < 60;
@@ -2754,13 +2914,17 @@ function runImageOcr() {
       const r = await worker.recognize(prep.canvas);
       datas.push(r.data);
     }
-    // 合并 words（文本+粗略位置去重），还原坐标到原图
+    // 合并 words（数字 + 表头列名，按文本+粗略位置去重），还原坐标到原图
+    const OCR_HDR_RE = /宽|长度|^长$|高度|^高$|深度|数量|张数|片数|件数|个数|图号|^图$|序号|^序$|编号|厚度|备注|打孔|钻孔|孔径|孔数|名称|规格|尺寸/;
     const merged = new Map();
     for (const data of datas) {
       for (const w of (data.words || [])) {
-        if (!/\d/.test(w.text)) continue;
+        const txt = (w.text || '').trim();
+        const isNum = /\d/.test(txt);
+        const isHdr = !isNum && OCR_HDR_RE.test(txt);
+        if (!isNum && !isHdr) continue;
         const b = w.bbox;
-        const key = `${w.text}|${Math.round(b.x0 / 10)}|${Math.round(b.y0 / 10)}`;
+        const key = `${txt}|${Math.round(b.x0 / 10)}|${Math.round(b.y0 / 10)}`;
         if (!merged.has(key)) merged.set(key, w);
       }
     }
@@ -2781,7 +2945,7 @@ function runImageOcr() {
     $('ocrClearBtn').style.display = '';
     $('importPreview').style.display = '';
     if (rows.length > 0) {
-      const low = words.filter(w => w.confidence < 60);
+      const low = words.filter(w => w.confidence < 60 && /\d/.test(w.text));
       let note = `识别到 ${rows.length} 行零件。图上红框=识别到的数字位置，橙框=置信度低需重点核对。请对照原图确认尺寸与板材对应后，可在下方修改 / 删除再导入。`;
       if (low.length > 0) note += `<br>低置信度数字：<span class="ocr-conf-low">${low.slice(0, 8).map(w => `${w.text}(${Math.round(w.confidence)}%)`).join('、')}</span>`;
       renderPreviewTable(rows, note);

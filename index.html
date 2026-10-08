@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.4</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.5</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4717,8 +4717,7 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
   }
   svgContent += '</g>';
 
-  // 全部余料区域高亮（虚线 + 浅绿填充）；每块可用余料都标注尺寸与面积，
-  // 不再只标注最大一块（右下角等独立余料块也要让用户一眼看到）
+  // 全部余料区域：只用浅绿虚线框整体标明范围，不标注尺寸与面积（保持画面清爽）
   const freeList = (r.freeRects && r.freeRects[sheetIdx]) ? r.freeRects[sheetIdx] : null;
   if (freeList && freeList.length > 0) {
     const sortedFree = freeList.slice().sort((a, b) => (b.w * b.h) - (a.w * a.h));
@@ -4728,42 +4727,11 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
       const my = mf.y * scale;
       const mw = mf.w * scale;
       const mh = mf.h * scale;
-      // 短边≤15mm 的多为锯缝/板边碎条，无法再利用，仅淡色提示、不标字
+      // 短边≤15mm 的多为锯缝/板边碎条，仅极淡色提示
       const usable = Math.min(mf.w, mf.h) > 15;
       svgContent += `<rect x="${mx}" y="${my}" width="${mw}" height="${mh}"
         fill="#2e9e5b" fill-opacity="${usable ? 0.07 : 0.03}"
         stroke="#2e9e5b" stroke-width="${usable ? 1.4 : 0.8}" stroke-dasharray="7,4"/>`;
-      if (!usable) continue;
-
-      const dimTxt = `余料 ${Math.round(mf.w)}×${Math.round(mf.h)} mm`;
-      const areaTxt = `面积 ${formatArea(mf.w * mf.h)} m²`;
-      const fcx = mx + mw / 2, fcy = my + mh / 2;
-      const titleFs = 11, areaFs = 10;
-      if (mw >= 88 && mh >= 26) {
-        // 横向够宽：水平双行
-        svgContent += `<text x="${fcx}" y="${fcy - 2}" text-anchor="middle" dominant-baseline="middle"
-          fill="#1e7a45" font-size="${titleFs}" font-weight="600" style="font-family:inherit;">${dimTxt}</text>`;
-        svgContent += `<text x="${fcx}" y="${fcy + 12}" text-anchor="middle" dominant-baseline="middle"
-          fill="#1e7a45" font-size="${areaFs}" style="font-family:inherit;">${areaTxt}</text>`;
-      } else if (mh >= 170 && mw >= 15) {
-        // 竖长余料：标题、面积旋转90°顺长边，沿竖直方向上下排开
-        const ax1 = fcx + 42, ax2 = fcx - 42;
-        svgContent += `<text x="${ax1}" y="${fcy}" text-anchor="middle" dominant-baseline="middle"
-          fill="#1e7a45" font-size="${titleFs}" font-weight="600"
-          transform="rotate(-90, ${ax1}, ${fcy})" style="font-family:inherit;">${dimTxt}</text>`;
-        svgContent += `<text x="${ax2}" y="${fcy}" text-anchor="middle" dominant-baseline="middle"
-          fill="#1e7a45" font-size="${areaFs}"
-          transform="rotate(-90, ${ax2}, ${fcy})" style="font-family:inherit;">${areaTxt}</text>`;
-      } else if (mw >= 54 && mh >= 14) {
-        // 横向扁条：单行标尺寸
-        svgContent += `<text x="${fcx}" y="${fcy}" text-anchor="middle" dominant-baseline="middle"
-          fill="#1e7a45" font-size="${areaFs}" font-weight="600" style="font-family:inherit;">${dimTxt}</text>`;
-      } else if (mh >= 54 && mw >= 12) {
-        // 竖窄余料：单行旋转标尺寸
-        svgContent += `<text x="${fcx}" y="${fcy}" text-anchor="middle" dominant-baseline="middle"
-          fill="#1e7a45" font-size="${areaFs}" font-weight="600"
-          transform="rotate(-90, ${fcx}, ${fcy})" style="font-family:inherit;">${dimTxt}</text>`;
-      }
     }
   }
 
@@ -4807,30 +4775,27 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
     const numMax = bigFont ? 28 : 20;
     const dimCap = bigFont ? 27 : 17;
 
-    // 编号做成「白底深色字胶囊标签」，与白色尺寸文字明显区分；
-    // 标签放在块内靠左 1/4 处、距上边缘约一个字符空位；尺寸在零件几何中心居中。
-    // 编号字号：受块宽、标签在 1/4 处不出血、块高共同约束
-    const numFs = clampFs(Math.min(numMax, (pw - 6) / nameU, (pw / 2 - 11) / nameU, (ph - 3) / 1.3), 8, numMax);
-    const badgeW = numFs * nameU + 9;
-    const badgeH = numFs * 1.3;
+    // 编号用黑色粗体（无胶囊底色），放在块内靠左 1/4 处、距上边缘约一个字符空位；
+    // 尺寸用白色粗体在零件几何中心居中，并自动避开编号文字。
+    // 编号字号：受块宽、编号在 1/4 处不出血、块高共同约束
+    const numFs = clampFs(Math.min(numMax, (pw - 6) / nameU, (pw / 2 - 5) / nameU, (ph - 3) / 1.3), 8, numMax);
     const numCx = px + pw / 4;
-    let numCy = py + Math.min(1.5 * numFs, ph - badgeH / 2 - 2);
-    numCy = Math.max(numCy, py + badgeH / 2 + 1);
-    const bx0 = numCx - badgeW / 2, bx1 = numCx + badgeW / 2;
-    const by0 = numCy - badgeH / 2, by1 = numCy + badgeH / 2;
+    let numCy = py + Math.min(1.5 * numFs, ph - numFs * 0.5 - 2);
+    numCy = Math.max(numCy, py + numFs * 0.5 + 1);
+    // 编号文字的包围盒（用于尺寸避让），四周留少量余量
+    const bx0 = numCx - numFs * nameU / 2 - 3, bx1 = numCx + numFs * nameU / 2 + 3;
+    const by0 = numCy - numFs * 0.55 - 2, by1 = numCy + numFs * 0.55 + 2;
 
     if (pw >= 30 && ph >= 18 && numFs >= 8) {
-      // 编号胶囊（白底深色字）
-      svgContent += `<rect x="${bx0}" y="${by0}" width="${badgeW}" height="${badgeH}" rx="4"
-        fill="rgba(255,255,255,0.92)" stroke="${strokeColor}" stroke-width="1"/>
-        <text x="${numCx}" y="${numCy + 0.5}" text-anchor="middle" dominant-baseline="middle"
-        fill="#1f2937" font-size="${numFs}" font-weight="800" style="font-family:inherit;">${nameShow}</text>`;
+      // 编号（黑色粗体，直接印在色块上）
+      svgContent += `<text x="${numCx}" y="${numCy + 0.5}" text-anchor="middle" dominant-baseline="middle"
+        fill="#111111" font-size="${numFs}" font-weight="800" style="font-family:inherit;">${nameShow}</text>`;
 
-      // 尺寸在中心(dcx,dcy)时，不与标签相交所允许的最大字号（水平分离或垂直分离取宽）
+      // 尺寸在中心(dcx,dcy)时，不与编号文字相交所允许的最大字号（水平分离或垂直分离取宽）
       function fitDimFs(dcx, dcy) {
         if (useVertical) {
-          const fGapV = dcy > by1 ? 2 * (dcy - by1) / dimU : 0; // 竖直方向让开标签
-          const fGapH = dcx > bx1 ? 2 * (dcx - bx1) : 0;        // 水平方向让开标签
+          const fGapV = dcy > by1 ? 2 * (dcy - by1) / dimU : 0; // 竖直方向让开编号
+          const fGapH = dcx > bx1 ? 2 * (dcx - bx1) : 0;        // 水平方向让开编号
           return Math.min(dimCap, ph * 0.94 / dimU, pw * 0.9, Math.max(fGapV, fGapH));
         } else {
           const fGapV = dcy > by1 ? 2 * (dcy - by1) : 0;
@@ -4841,7 +4806,7 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
       let dimFs = fitDimFs(cx, cy);
       let dimPosCx = cx, dimPosCy = cy;
       if (dimFs < 12) {
-        // 几何中心实在放不下：尺寸下移到标签下方剩余区居中
+        // 几何中心实在放不下：尺寸下移到编号下方剩余区居中
         const top = by1 + 3, bottom = py + ph - 3;
         dimPosCy = top + Math.max(0, bottom - top) / 2;
         dimFs = useVertical
@@ -4867,12 +4832,12 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
         }
       }
     } else if (pw > 12 && ph > 12) {
-      // 极小块：整块只居中显示编号
+      // 极小块：整块只居中显示编号（黑色粗体）
       const tinyFs = clampFs(Math.min(16, (pw - 4) / nameU, ph * 0.55), 7, 16);
       svgContent += `<text x="${cx}" y="${cy}"
         text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${tinyFs}" font-weight="700"
-        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
+        fill="#111111" font-size="${tinyFs}" font-weight="800"
+        style="font-family:inherit;">
         ${nameShow}
       </text>`;
     }

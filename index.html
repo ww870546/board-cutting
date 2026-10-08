@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.8</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.9</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4905,6 +4905,24 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
         .map(q => [Math.max(o.y, q.y), Math.min(o.y + o.h, q.y + q.h)]).filter(v => v[1] - v[0] > 0);
       cutBy(o.y, o.y + o.h, cov).forEach(([s, e]) => addSeg(false, o.x + o.w, s, e));
     });
+    // 板的四条外缘中，未被零件（外扩半个锯缝）覆盖的段，内侧就是余料——
+    // 沿板边框补绿色虚线，把每片余料的轮廓闭合成圈（零件贴板边的段仍保持灰色实线）。
+    const boardSeg = (horiz, fixed, len) => {
+      let cov;
+      if (horiz && fixed === 0) cov = occRects.filter(o => Math.abs(o.y) < EPS).map(o => [o.x, o.x + o.w]);
+      else if (horiz) cov = occRects.filter(o => Math.abs(o.y + o.h - r.sheetH) < EPS).map(o => [o.x, o.x + o.w]);
+      else if (fixed === 0) cov = occRects.filter(o => Math.abs(o.x) < EPS).map(o => [o.y, o.y + o.h]);
+      else cov = occRects.filter(o => Math.abs(o.x + o.w - r.sheetW) < EPS).map(o => [o.y, o.y + o.h]);
+      cov = cov.map(v => [Math.max(0, v[0]), Math.min(len, v[1])]).filter(v => v[1] - v[0] > 0);
+      cutBy(0, len, cov).forEach(([s, e]) => {
+        if (horiz) freeBorder += `<line x1="${s * scale}" y1="${fixed * scale}" x2="${e * scale}" y2="${fixed * scale}" stroke="#2e9e5b" stroke-width="1.8" stroke-dasharray="9,5"/>`;
+        else freeBorder += `<line x1="${fixed * scale}" y1="${s * scale}" x2="${fixed * scale}" y2="${e * scale}" stroke="#2e9e5b" stroke-width="1.8" stroke-dasharray="9,5"/>`;
+      });
+    };
+    boardSeg(true, 0, r.sheetW);              // 板顶
+    boardSeg(true, r.sheetH, r.sheetW);      // 板底
+    boardSeg(false, 0, r.sheetH);            // 板左
+    boardSeg(false, r.sheetW, r.sheetH);     // 板右
     svgContent += freeBorder;
   }
 

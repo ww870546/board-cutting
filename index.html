@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.42</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.43</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4758,56 +4758,72 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
     svgContent += `<rect x="${px}" y="${py}" width="${pw}" height="${ph}"
       fill="${baseColor}" fill-opacity="0.7" stroke="${adjustColor(baseColor, -40)}" stroke-width="1.2" rx="1"/>`;
 
-    // 零件编号和尺寸文字
+    // ===== 零件编号与尺寸文字（按零件实际毫米尺寸决定方向与字号）=====
+    // 规则：长×宽均≥255mm → 尺寸正面水平、大字；
+    //      仅一项<255mm → 尺寸顺长边方向、尽量大字；
+    //      两项均<255mm → 适当缩小字号、顺长边方向；
+    //      编号始终正面水平。
     const textColor = '#fff';
     const strokeColor = adjustColor(baseColor, -60);
     const cx = px + pw / 2;
     const cy = py + ph / 2;
-    // 竖向窄长条（如旋转后竖放的窄板条）：编号保持正面水平，尺寸顺长边旋转90°，避免溢出轮廓
-    const isVertStrip = pw < 64 && ph > pw * 2.2;
+    const rawName = p.name.length > 8 ? p.name.substr(0, 8) + '..' : p.name;
+    const nameShow = escapeHtml(rawName);
+    const dimText = `${Math.round(p.w)}×${Math.round(p.h)}`;
+    // 文字宽度占em数（中文约1em，数字/字母约0.58em，含两侧余量）
+    function textUnits(t) { let u = 0.25; for (const ch of String(t)) { u += /[\x00-\xff]/.test(ch) ? 0.58 : 1; } return u; }
+    const nameU = textUnits(rawName);
+    const dimU = textUnits(dimText);
+    const BIG = 255;
+    const bothBig = p.w >= BIG && p.h >= BIG;
+    const bothSmall = p.w < BIG && p.h < BIG;
+    const longSideHorizontal = p.w >= p.h;
+    const useVertical = !bothBig && !longSideHorizontal; // 双大强制水平；其余竖长边则竖排
+    const bigFont = !bothSmall;                          // 规则1/2 大字，规则3 缩小
+    const clampFs = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-    if (isVertStrip) {
-      // 编号：正面（水平），靠条顶部
-      const numFs = Math.min(16, Math.max(9, pw * 0.55));
+    if (useVertical && pw > 20 && ph > 25) {
+      // 布局B：编号正面水平靠条顶，尺寸顺长边旋转90°
+      const numFs = clampFs(Math.min(28, pw / nameU, pw * 0.88), 9, 28);
+      const dimFs = clampFs(Math.min(bigFont ? 28 : 18, ph / dimU, pw * 0.78), 9, bigFont ? 28 : 18);
+      const dcy = py + ph / 2 + numFs * 0.9;
       svgContent += `<text x="${cx}" y="${py + numFs + 5}"
         text-anchor="middle" dominant-baseline="middle"
         fill="${textColor}" font-size="${numFs}" font-weight="700"
         style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2.5px;">
-        ${escapeHtml(p.name.length > 8 ? p.name.substr(0, 8) + '..' : p.name)}
+        ${nameShow}
       </text>`;
-      // 尺寸：旋转 -90° 沿长边方向排布
-      const dimFs = Math.min(14, Math.max(8, Math.min(pw * 0.46, ph / 4.5)));
-      const dcy = py + ph / 2 + numFs * 0.8;
       svgContent += `<text x="${cx}" y="${dcy}"
         text-anchor="middle" dominant-baseline="middle"
         fill="${textColor}" font-size="${dimFs}" font-weight="700"
         transform="rotate(-90, ${cx}, ${dcy})"
         style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
-        ${Math.round(p.w)}×${Math.round(p.h)}
-      </text>`;
-    } else if (pw > 40 && ph > 30) {
-      const fontSize = Math.min(28, Math.max(9, Math.min(pw, ph) / 5.2));
-      // 零件名称
-      svgContent += `<text x="${cx}" y="${cy - fontSize * 0.8}"
-        text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${fontSize}" font-weight="700"
-        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2.5px;">
-        ${escapeHtml(p.name.length > 8 ? p.name.substr(0, 8) + '..' : p.name)}
-      </text>`;
-      // 尺寸
-      svgContent += `<text x="${cx}" y="${cy + fontSize * 0.6}"
-        text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${fontSize - 1}" font-weight="700"
-        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
-        ${Math.round(p.w)}×${Math.round(p.h)}
+        ${dimText}
       </text>`;
     } else if (pw > 25 && ph > 20) {
-      const smallFs = Math.min(28, Math.max(9, Math.min(pw, ph) / 5.2));
+      // 布局A：编号在上、尺寸在下，均正面水平
+      const numFs = clampFs(Math.min(bigFont ? 28 : 20, pw / nameU, ph * 0.42), 9, bigFont ? 28 : 20);
+      const dimFs = clampFs(Math.min(bigFont ? 27 : 17, pw / dimU, ph * 0.34), 9, bigFont ? 27 : 17);
+      svgContent += `<text x="${cx}" y="${cy - numFs * 0.85}"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="${textColor}" font-size="${numFs}" font-weight="700"
+        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2.5px;">
+        ${nameShow}
+      </text>`;
+      svgContent += `<text x="${cx}" y="${cy + dimFs * 0.7}"
+        text-anchor="middle" dominant-baseline="middle"
+        fill="${textColor}" font-size="${dimFs}" font-weight="700"
+        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
+        ${dimText}
+      </text>`;
+    } else if (pw > 16 && ph > 14) {
+      // 极小块：只显示正面编号
+      const tinyFs = clampFs(Math.min(16, pw / nameU, ph * 0.5), 8, 16);
       svgContent += `<text x="${cx}" y="${cy}"
         text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${smallFs - 1}" font-weight="700"
+        fill="${textColor}" font-size="${tinyFs}" font-weight="700"
         style="font-family:inherit;">
-        ${idx + 1}
+        ${nameShow}
       </text>`;
     }
 

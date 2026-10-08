@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.10</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.11</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4876,34 +4876,39 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
       return segs.filter(([s, e]) => e - s > 0.8);
     }
     let freeBorder = '';
-    const addSeg = (horiz, fixed, s, e) => {
+    // 虚线向余料内部挪开的间距（约一个锯缝 + 余量，不与零件描边重叠，观感同早期版本）
+    const gapMm = kerfMm + 2;
+    // dir = 外侧方向：水平边 -1=上 / +1=下；竖直边 -1=左 / +1=右
+    const addSeg = (horiz, fixed, s, e, dir) => {
       const mid = (s + e) / 2;
-      // 边外侧 1mm 的探测点
-      const pxp = horiz ? mid : (fixed - 1);
-      const pyp = horiz ? (fixed - 1) : mid;
+      // 边外侧 1mm 的探测点（方向随边而定）
+      const pxp = horiz ? mid : (fixed + dir * 1);
+      const pyp = horiz ? (fixed + dir * 1) : mid;
       if (!inBoard(pxp, pyp)) return;   // 外侧是板外（板物理边，实线表达），不画
       if (inOcc(pxp, pyp)) return;      // 外侧仍是零件（锯缝刀路），不画
-      // 外侧为余料 → 交界虚线
-      if (horiz) freeBorder += `<line x1="${s * scale}" y1="${fixed * scale}" x2="${e * scale}" y2="${fixed * scale}" stroke="#2e9e5b" stroke-width="1.8" stroke-dasharray="9,5"/>`;
-      else freeBorder += `<line x1="${fixed * scale}" y1="${s * scale}" x2="${fixed * scale}" y2="${e * scale}" stroke="#2e9e5b" stroke-width="1.8" stroke-dasharray="9,5"/>`;
+      // 外侧为余料 → 交界虚线；绘制位置向余料侧让开 gapMm，并夹在板内
+      const lim = horiz ? r.sheetH : r.sheetW;
+      const df = Math.min(Math.max(fixed + dir * gapMm, 0.6), lim - 0.6);
+      if (horiz) freeBorder += `<line x1="${s * scale}" y1="${df * scale}" x2="${e * scale}" y2="${df * scale}" stroke="#2e9e5b" stroke-width="2" stroke-dasharray="10,5"/>`;
+      else freeBorder += `<line x1="${df * scale}" y1="${s * scale}" x2="${df * scale}" y2="${e * scale}" stroke="#2e9e5b" stroke-width="2" stroke-dasharray="10,5"/>`;
     };
     occRects.forEach(o => {
       // 顶边（外侧上）：找底边与本顶边共线、贴在上方的零件覆盖区间
       let cov = occRects.filter(q => Math.abs((q.y + q.h) - o.y) < EPS && q.y + q.h <= o.y + EPS)
         .map(q => [Math.max(o.x, q.x), Math.min(o.x + o.w, q.x + q.w)]).filter(v => v[1] - v[0] > 0);
-      cutBy(o.x, o.x + o.w, cov).forEach(([s, e]) => addSeg(true, o.y, s, e));
+      cutBy(o.x, o.x + o.w, cov).forEach(([s, e]) => addSeg(true, o.y, s, e, -1));
       // 底边（外侧下）
       cov = occRects.filter(q => Math.abs(q.y - (o.y + o.h)) < EPS && q.y >= o.y + o.h - EPS)
         .map(q => [Math.max(o.x, q.x), Math.min(o.x + o.w, q.x + q.w)]).filter(v => v[1] - v[0] > 0);
-      cutBy(o.x, o.x + o.w, cov).forEach(([s, e]) => addSeg(true, o.y + o.h, s, e));
+      cutBy(o.x, o.x + o.w, cov).forEach(([s, e]) => addSeg(true, o.y + o.h, s, e, 1));
       // 左边（外侧左）
       cov = occRects.filter(q => Math.abs((q.x + q.w) - o.x) < EPS && q.x + q.w <= o.x + EPS)
         .map(q => [Math.max(o.y, q.y), Math.min(o.y + o.h, q.y + q.h)]).filter(v => v[1] - v[0] > 0);
-      cutBy(o.y, o.y + o.h, cov).forEach(([s, e]) => addSeg(false, o.x, s, e));
+      cutBy(o.y, o.y + o.h, cov).forEach(([s, e]) => addSeg(false, o.x, s, e, -1));
       // 右边（外侧右）
       cov = occRects.filter(q => Math.abs(q.x - (o.x + o.w)) < EPS && q.x >= o.x + o.w - EPS)
         .map(q => [Math.max(o.y, q.y), Math.min(o.y + o.h, q.y + q.h)]).filter(v => v[1] - v[0] > 0);
-      cutBy(o.y, o.y + o.h, cov).forEach(([s, e]) => addSeg(false, o.x + o.w, s, e));
+      cutBy(o.y, o.y + o.h, cov).forEach(([s, e]) => addSeg(false, o.x + o.w, s, e, 1));
     });
     // 板边保持板本身的实线，不画虚线；绿色虚线只标注余料靠零件的交界
     svgContent += freeBorder;

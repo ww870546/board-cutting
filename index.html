@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.40</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v1.41</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4732,12 +4732,12 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
       svgContent += `<rect x="${mx}" y="${my}" width="${mw}" height="${mh}"
         fill="#2e9e5b" fill-opacity="0.07" stroke="#2e9e5b" stroke-width="1.4" stroke-dasharray="7,4"/>`;
       if (mw > 90 && mh > 42) {
-        svgContent += `<text x="${mx + mw / 2}" y="${my + 15}" text-anchor="middle"
-          fill="#1e7a45" font-size="11" font-weight="600" style="font-family:inherit;">
+        svgContent += `<text x="${mx + mw / 2}" y="${my + 17}" text-anchor="middle"
+          fill="#1e7a45" font-size="13" font-weight="700" style="font-family:inherit;">
           余料 ${Math.round(maxFree.w)}×${Math.round(maxFree.h)} mm
         </text>`;
-        svgContent += `<text x="${mx + mw / 2}" y="${my + 29}" text-anchor="middle"
-          fill="#1e7a45" font-size="10" style="font-family:inherit;">
+        svgContent += `<text x="${mx + mw / 2}" y="${my + 33}" text-anchor="middle"
+          fill="#1e7a45" font-size="12" style="font-family:inherit;">
           面积 ${formatArea(maxFree.w * maxFree.h)} m²
         </text>`;
       }
@@ -4759,28 +4759,28 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
       fill="${baseColor}" fill-opacity="0.7" stroke="${adjustColor(baseColor, -40)}" stroke-width="1.2" rx="1"/>`;
 
     // 零件编号和尺寸文字
-    const fontSize = Math.min(11, Math.max(8, Math.min(pw, ph) / 6));
+    const fontSize = Math.min(18, Math.max(9, Math.min(pw, ph) / 5.2));
     const textColor = '#fff';
 
     if (pw > 40 && ph > 30) {
       // 零件名称
       svgContent += `<text x="${px + pw / 2}" y="${py + ph / 2 - fontSize * 0.8}"
         text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${fontSize}" font-weight="600"
-        style="font-family:inherit; paint-order:stroke; stroke:${adjustColor(baseColor,-60)}; stroke-width:2px;">
+        fill="${textColor}" font-size="${fontSize}" font-weight="700"
+        style="font-family:inherit; paint-order:stroke; stroke:${adjustColor(baseColor,-60)}; stroke-width:2.5px;">
         ${escapeHtml(p.name.length > 8 ? p.name.substr(0, 8) + '..' : p.name)}
       </text>`;
       // 尺寸
       svgContent += `<text x="${px + pw / 2}" y="${py + ph / 2 + fontSize * 0.6}"
         text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${fontSize - 1}"
-        style="font-family:inherit; paint-order:stroke; stroke:${adjustColor(baseColor,-60)}; stroke-width:1.5px;">
+        fill="${textColor}" font-size="${fontSize - 1}" font-weight="700"
+        style="font-family:inherit; paint-order:stroke; stroke:${adjustColor(baseColor,-60)}; stroke-width:2px;">
         ${Math.round(p.w)}×${Math.round(p.h)}
       </text>`;
     } else if (pw > 25 && ph > 20) {
       svgContent += `<text x="${px + pw / 2}" y="${py + ph / 2}"
         text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${fontSize - 1}" font-weight="600"
+        fill="${textColor}" font-size="${fontSize - 1}" font-weight="700"
         style="font-family:inherit;">
         ${idx + 1}
       </text>`;
@@ -4798,24 +4798,24 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
     svgContent += `</g>`;
   });
 
-  // 尺寸标注（两侧字号统一为 11；文字放在标注线外侧避免重叠）
+  // 尺寸标注（两侧字号统一加大加粗；文字放在标注线外侧避免重叠）
   const dimOffset = 70;
-  const dimColor = '#666';
+  const dimColor = '#3a3a3a';
 
   // 顶部宽度标注
   svgContent += `<g class="dimension">
-    <line x1="0" y1="${-dimOffset + 32}" x2="${displayW}" y2="${-dimOffset + 32}" stroke="${dimColor}" stroke-width="0.8"/>
-    <line x1="0" y1="${-dimOffset + 28}" x2="0" y2="${-dimOffset + 36}" stroke="${dimColor}" stroke-width="0.8"/>
-    <line x1="${displayW}" y1="${-dimOffset + 28}" x2="${displayW}" y2="${-dimOffset + 36}" stroke="${dimColor}" stroke-width="0.8"/>
-    <text x="${displayW / 2}" y="${-dimOffset + 20}" text-anchor="middle" fill="${dimColor}" font-size="11" style="font-family:inherit;">${r.sheetW} mm</text>
+    <line x1="0" y1="${-dimOffset + 32}" x2="${displayW}" y2="${-dimOffset + 32}" stroke="${dimColor}" stroke-width="1"/>
+    <line x1="0" y1="${-dimOffset + 28}" x2="0" y2="${-dimOffset + 36}" stroke="${dimColor}" stroke-width="1"/>
+    <line x1="${displayW}" y1="${-dimOffset + 28}" x2="${displayW}" y2="${-dimOffset + 36}" stroke="${dimColor}" stroke-width="1"/>
+    <text x="${displayW / 2}" y="${-dimOffset + 20}" text-anchor="middle" fill="${dimColor}" font-size="15" font-weight="700" style="font-family:inherit;">${r.sheetW} mm</text>
   </g>`;
 
   // 左侧高度标注
   svgContent += `<g class="dimension">
-    <line x1="${-dimOffset + 40}" y1="0" x2="${-dimOffset + 40}" y2="${displayH}" stroke="${dimColor}" stroke-width="0.8"/>
-    <line x1="${-dimOffset + 36}" y1="0" x2="${-dimOffset + 44}" y2="0" stroke="${dimColor}" stroke-width="0.8"/>
-    <line x1="${-dimOffset + 36}" y1="${displayH}" x2="${-dimOffset + 44}" y2="${displayH}" stroke="${dimColor}" stroke-width="0.8"/>
-    <text x="${-dimOffset + 30}" y="${displayH / 2}" text-anchor="middle" fill="${dimColor}" font-size="11"
+    <line x1="${-dimOffset + 40}" y1="0" x2="${-dimOffset + 40}" y2="${displayH}" stroke="${dimColor}" stroke-width="1"/>
+    <line x1="${-dimOffset + 36}" y1="0" x2="${-dimOffset + 44}" y2="0" stroke="${dimColor}" stroke-width="1"/>
+    <line x1="${-dimOffset + 36}" y1="${displayH}" x2="${-dimOffset + 44}" y2="${displayH}" stroke="${dimColor}" stroke-width="1"/>
+    <text x="${-dimOffset + 30}" y="${displayH / 2}" text-anchor="middle" fill="${dimColor}" font-size="15" font-weight="700"
       transform="rotate(-90, ${-dimOffset + 30}, ${displayH / 2})" style="font-family:inherit;">${r.sheetH} mm</text>
   </g>`;
 

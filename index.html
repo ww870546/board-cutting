@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.3</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.4</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4804,49 +4804,71 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
     const useVertical = !bothBig && !longSideHorizontal; // 双大强制水平；其余竖长边则竖排
     const bigFont = !bothSmall;                          // 规则1/2 大字，规则3 缩小
     const clampFs = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-
-    // 编号统一固定在块内「顶部居中」（正面水平）；尺寸在编号下方的剩余区域居中。
-    // 这样竖放时编号与旋转的尺寸不再抢中心、尺寸也不会冲出轮廓。
-    const padTop = 4, padSide = 3;
     const numMax = bigFont ? 28 : 20;
-    const numFs = clampFs((pw - padSide * 2) / nameU, 9, numMax);
-    const numH = numFs * 1.18;                          // 编号行占用高度
-    const dimZoneH = ph - numH - padTop * 2;            // 尺寸可用高度
-    const dimCy = py + numH + padTop + Math.max(0, dimZoneH) / 2;
-    const numY = py + padTop + numFs * 0.6;
     const dimCap = bigFont ? 27 : 17;
 
-    if (pw > 16 && ph > 14 && dimZoneH >= 11) {
-      // 编号：顶部居中
-      svgContent += `<text x="${cx}" y="${numY}"
-        text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${numFs}" font-weight="700"
-        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2.5px;">
-        ${nameShow}
-      </text>`;
-      if (useVertical) {
-        // 尺寸顺长边旋转90°，旋转中心在尺寸区正中；字长受剩余高度限制、字粗受块宽限制
-        const dimFs = clampFs(Math.min(dimCap, dimZoneH / dimU, (pw - padSide * 2) * 0.92), 8, dimCap);
-        svgContent += `<text x="${cx}" y="${dimCy}"
-          text-anchor="middle" dominant-baseline="middle"
-          fill="${textColor}" font-size="${dimFs}" font-weight="700"
-          transform="rotate(-90, ${cx}, ${dimCy})"
-          style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
-          ${dimText}
-        </text>`;
-      } else {
-        // 尺寸正面水平，在剩余区域居中
-        const dimFs = clampFs(Math.min(dimCap, (pw - padSide * 2) / dimU, dimZoneH * 0.95), 8, dimCap);
-        svgContent += `<text x="${cx}" y="${dimCy}"
-          text-anchor="middle" dominant-baseline="middle"
-          fill="${textColor}" font-size="${dimFs}" font-weight="700"
-          style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
-          ${dimText}
-        </text>`;
+    // 编号做成「白底深色字胶囊标签」，与白色尺寸文字明显区分；
+    // 标签放在块内靠左 1/4 处、距上边缘约一个字符空位；尺寸在零件几何中心居中。
+    // 编号字号：受块宽、标签在 1/4 处不出血、块高共同约束
+    const numFs = clampFs(Math.min(numMax, (pw - 6) / nameU, (pw / 2 - 11) / nameU, (ph - 3) / 1.3), 8, numMax);
+    const badgeW = numFs * nameU + 9;
+    const badgeH = numFs * 1.3;
+    const numCx = px + pw / 4;
+    let numCy = py + Math.min(1.5 * numFs, ph - badgeH / 2 - 2);
+    numCy = Math.max(numCy, py + badgeH / 2 + 1);
+    const bx0 = numCx - badgeW / 2, bx1 = numCx + badgeW / 2;
+    const by0 = numCy - badgeH / 2, by1 = numCy + badgeH / 2;
+
+    if (pw >= 30 && ph >= 18 && numFs >= 8) {
+      // 编号胶囊（白底深色字）
+      svgContent += `<rect x="${bx0}" y="${by0}" width="${badgeW}" height="${badgeH}" rx="4"
+        fill="rgba(255,255,255,0.92)" stroke="${strokeColor}" stroke-width="1"/>
+        <text x="${numCx}" y="${numCy + 0.5}" text-anchor="middle" dominant-baseline="middle"
+        fill="#1f2937" font-size="${numFs}" font-weight="800" style="font-family:inherit;">${nameShow}</text>`;
+
+      // 尺寸在中心(dcx,dcy)时，不与标签相交所允许的最大字号（水平分离或垂直分离取宽）
+      function fitDimFs(dcx, dcy) {
+        if (useVertical) {
+          const fGapV = dcy > by1 ? 2 * (dcy - by1) / dimU : 0; // 竖直方向让开标签
+          const fGapH = dcx > bx1 ? 2 * (dcx - bx1) : 0;        // 水平方向让开标签
+          return Math.min(dimCap, ph * 0.94 / dimU, pw * 0.9, Math.max(fGapV, fGapH));
+        } else {
+          const fGapV = dcy > by1 ? 2 * (dcy - by1) : 0;
+          const fGapH = dcx > bx1 ? 2 * (dcx - bx1) / dimU : 0;
+          return Math.min(dimCap, pw * 0.96 / dimU, ph * 0.62, Math.max(fGapV, fGapH));
+        }
       }
-    } else if (pw > 16 && ph > 14) {
-      // 剩余高度放不下两行：整块只居中显示编号
-      const tinyFs = clampFs(Math.min(numMax, (pw - padSide * 2) / nameU, ph * 0.6), 8, numMax);
+      let dimFs = fitDimFs(cx, cy);
+      let dimPosCx = cx, dimPosCy = cy;
+      if (dimFs < 12) {
+        // 几何中心实在放不下：尺寸下移到标签下方剩余区居中
+        const top = by1 + 3, bottom = py + ph - 3;
+        dimPosCy = top + Math.max(0, bottom - top) / 2;
+        dimFs = useVertical
+          ? Math.min(dimCap, (bottom - top) * 0.96 / dimU, pw * 0.9)
+          : Math.min(dimCap, pw * 0.96 / dimU, (bottom - top) * 0.95);
+      }
+      if (dimFs >= 8) {
+        if (useVertical) {
+          svgContent += `<text x="${dimPosCx}" y="${dimPosCy}"
+            text-anchor="middle" dominant-baseline="middle"
+            fill="${textColor}" font-size="${dimFs}" font-weight="700"
+            transform="rotate(-90, ${dimPosCx}, ${dimPosCy})"
+            style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
+            ${dimText}
+          </text>`;
+        } else {
+          svgContent += `<text x="${dimPosCx}" y="${dimPosCy}"
+            text-anchor="middle" dominant-baseline="middle"
+            fill="${textColor}" font-size="${dimFs}" font-weight="700"
+            style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
+            ${dimText}
+          </text>`;
+        }
+      }
+    } else if (pw > 12 && ph > 12) {
+      // 极小块：整块只居中显示编号
+      const tinyFs = clampFs(Math.min(16, (pw - 4) / nameU, ph * 0.55), 7, 16);
       svgContent += `<text x="${cx}" y="${cy}"
         text-anchor="middle" dominant-baseline="middle"
         fill="${textColor}" font-size="${tinyFs}" font-weight="700"

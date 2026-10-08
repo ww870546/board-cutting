@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.2</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.3</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4805,47 +4805,52 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
     const bigFont = !bothSmall;                          // 规则1/2 大字，规则3 缩小
     const clampFs = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-    if (useVertical && pw > 20 && ph > 25) {
-      // 布局B：编号正面水平靠条顶，尺寸顺长边旋转90°
-      const numFs = clampFs(Math.min(28, pw / nameU, pw * 0.88), 9, 28);
-      const dimFs = clampFs(Math.min(bigFont ? 28 : 18, ph / dimU, pw * 0.78), 9, bigFont ? 28 : 18);
-      const dcy = py + ph / 2 + numFs * 0.9;
-      svgContent += `<text x="${cx}" y="${py + numFs + 5}"
+    // 编号统一固定在块内「顶部居中」（正面水平）；尺寸在编号下方的剩余区域居中。
+    // 这样竖放时编号与旋转的尺寸不再抢中心、尺寸也不会冲出轮廓。
+    const padTop = 4, padSide = 3;
+    const numMax = bigFont ? 28 : 20;
+    const numFs = clampFs((pw - padSide * 2) / nameU, 9, numMax);
+    const numH = numFs * 1.18;                          // 编号行占用高度
+    const dimZoneH = ph - numH - padTop * 2;            // 尺寸可用高度
+    const dimCy = py + numH + padTop + Math.max(0, dimZoneH) / 2;
+    const numY = py + padTop + numFs * 0.6;
+    const dimCap = bigFont ? 27 : 17;
+
+    if (pw > 16 && ph > 14 && dimZoneH >= 11) {
+      // 编号：顶部居中
+      svgContent += `<text x="${cx}" y="${numY}"
         text-anchor="middle" dominant-baseline="middle"
         fill="${textColor}" font-size="${numFs}" font-weight="700"
         style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2.5px;">
         ${nameShow}
       </text>`;
-      svgContent += `<text x="${cx}" y="${dcy}"
-        text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${dimFs}" font-weight="700"
-        transform="rotate(-90, ${cx}, ${dcy})"
-        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
-        ${dimText}
-      </text>`;
-    } else if (pw > 25 && ph > 20) {
-      // 布局A：编号在上、尺寸在下，均正面水平
-      const numFs = clampFs(Math.min(bigFont ? 28 : 20, pw / nameU, ph * 0.42), 9, bigFont ? 28 : 20);
-      const dimFs = clampFs(Math.min(bigFont ? 27 : 17, pw / dimU, ph * 0.34), 9, bigFont ? 27 : 17);
-      svgContent += `<text x="${cx}" y="${cy - numFs * 0.85}"
-        text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${numFs}" font-weight="700"
-        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2.5px;">
-        ${nameShow}
-      </text>`;
-      svgContent += `<text x="${cx}" y="${cy + dimFs * 0.7}"
-        text-anchor="middle" dominant-baseline="middle"
-        fill="${textColor}" font-size="${dimFs}" font-weight="700"
-        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
-        ${dimText}
-      </text>`;
+      if (useVertical) {
+        // 尺寸顺长边旋转90°，旋转中心在尺寸区正中；字长受剩余高度限制、字粗受块宽限制
+        const dimFs = clampFs(Math.min(dimCap, dimZoneH / dimU, (pw - padSide * 2) * 0.92), 8, dimCap);
+        svgContent += `<text x="${cx}" y="${dimCy}"
+          text-anchor="middle" dominant-baseline="middle"
+          fill="${textColor}" font-size="${dimFs}" font-weight="700"
+          transform="rotate(-90, ${cx}, ${dimCy})"
+          style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
+          ${dimText}
+        </text>`;
+      } else {
+        // 尺寸正面水平，在剩余区域居中
+        const dimFs = clampFs(Math.min(dimCap, (pw - padSide * 2) / dimU, dimZoneH * 0.95), 8, dimCap);
+        svgContent += `<text x="${cx}" y="${dimCy}"
+          text-anchor="middle" dominant-baseline="middle"
+          fill="${textColor}" font-size="${dimFs}" font-weight="700"
+          style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
+          ${dimText}
+        </text>`;
+      }
     } else if (pw > 16 && ph > 14) {
-      // 极小块：只显示正面编号
-      const tinyFs = clampFs(Math.min(16, pw / nameU, ph * 0.5), 8, 16);
+      // 剩余高度放不下两行：整块只居中显示编号
+      const tinyFs = clampFs(Math.min(numMax, (pw - padSide * 2) / nameU, ph * 0.6), 8, numMax);
       svgContent += `<text x="${cx}" y="${cy}"
         text-anchor="middle" dominant-baseline="middle"
         fill="${textColor}" font-size="${tinyFs}" font-weight="700"
-        style="font-family:inherit;">
+        style="font-family:inherit; paint-order:stroke; stroke:${strokeColor}; stroke-width:2px;">
         ${nameShow}
       </text>`;
     }

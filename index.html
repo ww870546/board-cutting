@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.6</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.7</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4718,10 +4718,21 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
   svgContent += '</g>';
 
   // 余料整体标示：整张板先铺一层浅绿（代表"未摆放零件的整体余料区"），
-  // 绘制每个零件时再用板底色把该位置盖回、叠上零件色块——于是余料连成一整片，
-  // 只在最后沿板四周画一整圈虚线，不画算法切出的碎块分隔线，避免误导余料形状。
+  // 绘制每个零件时再用板底色把该位置（含半个锯缝刀路）盖回、叠上零件色块——
+  // 于是余料连成一整片；锯缝是走刀刀路、走刀后不存在，相邻零件各外扩半个锯缝刚好盖住，不画余料线。
+  // 最后只沿"余料区与零件的交界"画虚线，板的物理外框保持实线，不整圈画虚线。
   const freeList = (r.freeRects && r.freeRects[sheetIdx]) ? r.freeRects[sheetIdx] : null;
   const hasFree = freeList && freeList.some(mf => mf.w > 0 && mf.h > 0);
+  const kerfMm = parseFloat($('sawKerf').value) || 0;
+  const padMm = kerfMm / 2; // 半个锯缝：相邻零件外扩后正好填满刀路
+  // 已利用区（零件外扩半个锯缝、裁剪到板内），用于盖底色与求余料交界
+  const occRects = hasFree ? sheet.map(p => {
+    const x0 = Math.max(0, p.x - padMm);
+    const y0 = Math.max(0, p.y - padMm);
+    const x1 = Math.min(r.sheetW, p.x + p.w + padMm);
+    const y1 = Math.min(r.sheetH, p.y + p.h + padMm);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }).filter(o => o.w > 0 && o.h > 0) : [];
   if (hasFree) {
     svgContent += `<rect x="0" y="0" width="${displayW}" height="${displayH}"
       fill="#2e9e5b" fill-opacity="0.07"/>`;
@@ -4737,9 +4748,13 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
     const baseColor = p.color;
 
     svgContent += `<g>`;
-    // 零件位置先盖回板底色（遮住整板浅绿余料层，锯缝处自然保留细绿缝），再叠零件色块
+    // 零件位置先盖回板底色（外扩半个锯缝，遮住整板浅绿余料层与刀路细缝），再叠零件色块
     if (hasFree) {
-      svgContent += `<rect x="${px}" y="${py}" width="${pw}" height="${ph}" fill="#f5f5f0"/>`;
+      const gx = Math.max(0, p.x - padMm) * scale;
+      const gy = Math.max(0, p.y - padMm) * scale;
+      const gw = (Math.min(r.sheetW, p.x + p.w + padMm) - Math.max(0, p.x - padMm)) * scale;
+      const gh = (Math.min(r.sheetH, p.y + p.h + padMm) - Math.max(0, p.y - padMm)) * scale;
+      svgContent += `<rect x="${gx}" y="${gy}" width="${gw}" height="${gh}" fill="#f5f5f0"/>`;
     }
     // 零件矩形
     svgContent += `<rect x="${px}" y="${py}" width="${pw}" height="${ph}"
@@ -4850,10 +4865,56 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
     svgContent += `</g>`;
   });
 
-  // 余料整体标示：沿整张板四周画一整圈虚线（内部不画碎块分隔线）
+  // 余料（未裁切区）轮廓虚线：只画"余料区 ↔ 零件"的交界边。
+  // 相邻零件之间是锯缝刀路（外扩半个锯缝后已相接），不画；板的物理外框保持实线，也不画。
   if (hasFree) {
-    svgContent += `<rect x="0.6" y="0.6" width="${displayW - 1.2}" height="${displayH - 1.2}"
-      fill="none" stroke="#2e9e5b" stroke-width="1.8" stroke-dasharray="9,5"/>`;
+    const EPS = 0.6;
+    const inOcc = (x, y) => occRects.some(o => x >= o.x - EPS && x <= o.x + o.w + EPS && y >= o.y - EPS && y <= o.y + o.h + EPS);
+    const inBoard = (x, y) => x >= -EPS && y >= -EPS && x <= r.sheetW + EPS && y <= r.sheetH + EPS;
+    // 线段 [a,b] 减去若干覆盖区间
+    function cutBy(a, b, covers) {
+      let segs = [[a, b]];
+      for (const [c, d] of covers) {
+        const next = [];
+        for (const [s, e] of segs) {
+          if (d <= s || c >= e) next.push([s, e]);
+          else { if (c > s) next.push([s, c]); if (d < e) next.push([d, e]); }
+        }
+        segs = next;
+      }
+      return segs.filter(([s, e]) => e - s > 0.8);
+    }
+    let freeBorder = '';
+    const addSeg = (horiz, fixed, s, e) => {
+      const mid = (s + e) / 2;
+      // 边外侧 1mm 的探测点
+      const pxp = horiz ? mid : (fixed - 1);
+      const pyp = horiz ? (fixed - 1) : mid;
+      if (!inBoard(pxp, pyp)) return;   // 外侧是板外（板物理边，实线表达），不画
+      if (inOcc(pxp, pyp)) return;      // 外侧仍是零件（锯缝刀路），不画
+      // 外侧为余料 → 交界虚线
+      if (horiz) freeBorder += `<line x1="${s * scale}" y1="${fixed * scale}" x2="${e * scale}" y2="${fixed * scale}" stroke="#2e9e5b" stroke-width="1.8" stroke-dasharray="9,5"/>`;
+      else freeBorder += `<line x1="${fixed * scale}" y1="${s * scale}" x2="${fixed * scale}" y2="${e * scale}" stroke="#2e9e5b" stroke-width="1.8" stroke-dasharray="9,5"/>`;
+    };
+    occRects.forEach(o => {
+      // 顶边（外侧上）：找底边与本顶边共线、贴在上方的零件覆盖区间
+      let cov = occRects.filter(q => Math.abs((q.y + q.h) - o.y) < EPS && q.y + q.h <= o.y + EPS)
+        .map(q => [Math.max(o.x, q.x), Math.min(o.x + o.w, q.x + q.w)]).filter(v => v[1] - v[0] > 0);
+      cutBy(o.x, o.x + o.w, cov).forEach(([s, e]) => addSeg(true, o.y, s, e));
+      // 底边（外侧下）
+      cov = occRects.filter(q => Math.abs(q.y - (o.y + o.h)) < EPS && q.y >= o.y + o.h - EPS)
+        .map(q => [Math.max(o.x, q.x), Math.min(o.x + o.w, q.x + q.w)]).filter(v => v[1] - v[0] > 0);
+      cutBy(o.x, o.x + o.w, cov).forEach(([s, e]) => addSeg(true, o.y + o.h, s, e));
+      // 左边（外侧左）
+      cov = occRects.filter(q => Math.abs((q.x + q.w) - o.x) < EPS && q.x + q.w <= o.x + EPS)
+        .map(q => [Math.max(o.y, q.y), Math.min(o.y + o.h, q.y + q.h)]).filter(v => v[1] - v[0] > 0);
+      cutBy(o.y, o.y + o.h, cov).forEach(([s, e]) => addSeg(false, o.x, s, e));
+      // 右边（外侧右）
+      cov = occRects.filter(q => Math.abs(q.x - (o.x + o.w)) < EPS && q.x >= o.x + o.w - EPS)
+        .map(q => [Math.max(o.y, q.y), Math.min(o.y + o.h, q.y + q.h)]).filter(v => v[1] - v[0] > 0);
+      cutBy(o.y, o.y + o.h, cov).forEach(([s, e]) => addSeg(false, o.x + o.w, s, e));
+    });
+    svgContent += freeBorder;
   }
 
   // 尺寸标注（36px 加粗深色；文字放在标注线外侧避免重叠，dimOffset 加大防止大字被裁切）

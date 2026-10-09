@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.16</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.17</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4636,24 +4636,17 @@ function runOptimization() {
       })
     : state.parts;
 
-  // 检查零件是否超过板材尺寸（考虑锯缝）
+  // 检查零件是否超过板材尺寸（考虑锯缝）。与排布器一致采用虚拟板：贴板边的零件不扣锯缝，
+  // 即每边允许到 板材尺寸+锯缝（packW/packH）。只要存在一种朝向（原样或旋转90°）放得下即可。
+  const packWChk = sheetW + kerf;
+  const packHChk = sheetH + kerf;
   for (const p of effParts) {
     const effW = p.width + kerf;
     const effH = p.height + kerf;
-    const maxDim = Math.max(effW, effH);
-    const minDim = Math.min(effW, effH);
-    const sheetMax = Math.max(sheetW, sheetH);
-    const sheetMin = Math.min(sheetW, sheetH);
-    if (maxDim > sheetMax || (minDim > sheetMin && !p.rotatable)) {
+    const fitNormal = effW <= packWChk && effH <= packHChk;
+    const fitRotated = p.rotatable && effH <= packWChk && effW <= packHChk;
+    if (!fitNormal && !fitRotated) {
       showToast(`零件「${p.name}」加锯缝后尺寸超过板材，无法切割`, 'error');
-      return;
-    }
-    if (effW > sheetW && effH > sheetH && !p.rotatable) {
-      showToast(`零件「${p.name}」加锯缝后超过板材且不允许旋转`, 'error');
-      return;
-    }
-    if (p.rotatable && effW > sheetMax && effH > sheetMax) {
-      showToast(`零件「${p.name}」加锯缝后尺寸超过板材最大边`, 'error');
       return;
     }
   }

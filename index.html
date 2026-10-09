@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.12</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.13</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4646,6 +4646,7 @@ function runOptimization() {
 
     state.results = bestResult;
     state.activeSheet = 0;
+    boardZoom.initialized = false;   // 重新优化后需要重新自适应窗口
     renderResults();
     // 移动端：计算完成后自动切换到「排版结果」视图
     if (window.innerWidth <= 768) setMobileView('result');
@@ -4955,6 +4956,13 @@ function buildSheetSVG(sheetIdx, maxW, maxH) {
 
 function renderSheetVisualization() {
   const area = $('visualizationArea');
+  // 切换板时各板 SVG 像素尺寸一致，直接沿用当前缩放/平移，避免“先放大再回弹”；
+  // 仅首次或重新优化时先隐藏，等自适应窗口算好再显示。
+  const keepZoom = boardZoom.initialized;
+  const innerStyle = keepZoom
+    ? 'transform:translate(' + boardZoom.tx + 'px,' + boardZoom.ty + 'px) scale(' + boardZoom.scale + ');'
+    : 'visibility:hidden;';
+  const levelText = keepZoom ? (Math.round(boardZoom.scale * 100) + '%') : '100%';
   area.innerHTML = `
     <div class="board-zoom-wrap">
       <div class="board-zoom-controls">
@@ -4962,10 +4970,10 @@ function renderSheetVisualization() {
         <button type="button" class="zoom-btn" onclick="zoomBoard(0.8)" title="缩小">－</button>
         <button type="button" class="zoom-btn" onclick="resetBoardZoom()" title="实际大小">1:1</button>
         <button type="button" class="zoom-btn" onclick="fitBoardZoom()" title="适应窗口">适应</button>
-        <span class="zoom-level" id="zoomLevel">100%</span>
+        <span class="zoom-level" id="zoomLevel">${levelText}</span>
       </div>
       <div class="board-zoom-container" id="boardZoomContainer">
-        <div class="board-zoom-inner" id="boardZoomInner">
+        <div class="board-zoom-inner" id="boardZoomInner" style="${innerStyle}">
           <div class="board-container">
             ${buildSheetSVG(state.activeSheet, 1400, 900)}
           </div>
@@ -4977,7 +4985,7 @@ function renderSheetVisualization() {
 }
 
 // ========== 排版图缩放与平移 ==========
-const boardZoom = { scale: 1, tx: 0, ty: 0, dragging: false, startX: 0, startY: 0, startTx: 0, startTy: 0 };
+const boardZoom = { scale: 1, tx: 0, ty: 0, dragging: false, startX: 0, startY: 0, startTx: 0, startTy: 0, initialized: false };
 
 function applyBoardZoom() {
   const inner = $('boardZoomInner');
@@ -5040,9 +5048,14 @@ function boardZoomOnUp() {
 function initBoardZoom() {
   const container = $('boardZoomContainer');
   if (!container) return;
-  // 每次重新渲染后重置为 1:1
-  boardZoom.scale = 1; boardZoom.tx = 0; boardZoom.ty = 0;
-  applyBoardZoom();
+  if (boardZoom.initialized) {
+    // 切换板：沿用已有缩放/平移，不重置、不自适应，杜绝闪烁
+    applyBoardZoom();
+  } else {
+    // 首次/重新优化：画布先隐藏，等自适应窗口算好再显示，避免先以 1:1 闪现
+    boardZoom.scale = 1; boardZoom.tx = 0; boardZoom.ty = 0;
+    applyBoardZoom();
+  }
 
   // 滚轮缩放（以鼠标位置为中心）
   container.onwheel = function (e) {
@@ -5096,10 +5109,20 @@ function initBoardZoom() {
   };
   container.ontouchend = function () { touchDist = 0; singleTouch = null; };
 
-  // 渲染完成后自动适配窗口：整板完整显示，上下左右留白均匀
-  requestAnimationFrame(function () {
-    requestAnimationFrame(function () { fitBoardZoom(); });
-  });
+  // 首次/重新优化：渲染完成后自动适配窗口（整板完整显示），算好再显示画布
+  if (!boardZoom.initialized) {
+    var doInitialFit = function () {
+      if (boardZoom.initialized) return;
+      fitBoardZoom();
+      const inner0 = $('boardZoomInner');
+      if (inner0) inner0.style.visibility = 'visible';
+      boardZoom.initialized = true;
+    };
+    requestAnimationFrame(function () {
+      requestAnimationFrame(doInitialFit);
+    });
+    setTimeout(doInitialFit, 160);   // 兜底：确保画布一定显示并完成首次自适应
+  }
 }
 
 function renderCutList() {

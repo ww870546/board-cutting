@@ -1278,17 +1278,19 @@ tr.lb-manual td { background: #fff7ec; }
 .layout-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 8px 244px 8px 12px;  /* 右侧让出悬浮缩放控件（＋－1:1 适应）的位置，避免遮挡 */
   background: var(--bg-secondary, #f6f7f9);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   margin-bottom: 8px;
   flex-wrap: wrap;
 }
-.layout-info { flex: 1 1 auto; min-width: 200px; display: flex; flex-direction: column; line-height: 1.35; }
-.li-main { font-size: 15px; font-weight: 700; color: var(--text-primary); }
-.li-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+.layout-info { flex: 0 0 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.li-main { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.li-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; }
+.lo-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .lo-nav {
   min-width: 38px; height: 38px; font-size: 22px; line-height: 1;
   border: 1px solid var(--border); background: var(--bg-primary);
@@ -1327,6 +1329,13 @@ tr.lb-manual td { background: #fff7ec; }
 .lo-count { display: inline-block; padding: 0 6px; font-size: 12px; color: #fff; background: var(--accent); border-radius: 8px; }
 .lo-range { font-size: 13px; color: var(--text-primary); margin-top: 3px; }
 .lo-eff { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+@media (max-width: 900px) {
+  /* 窄屏缩放控件几乎占满顶部右侧，布局条整体下移到其下方，文字与按钮分两行 */
+  .layout-bar { padding-right: 12px; padding-top: 10px; gap: 8px; margin-top: 46px; }
+  .layout-info { flex: 1 1 100%; }
+  .li-main, .li-sub { white-space: normal; }
+  .lo-actions { flex: 1 1 100%; }
+}
 @media (max-width: 768px) {
   .li-main { font-size: 14px; }
   .lo-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -1488,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.14</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.15</span>
     </div>
 
     <!-- 历史方案 -->
@@ -5141,13 +5150,15 @@ function renderSheetVisualization() {
     const eff = (rr.sheets[g.first].reduce((s, p) => s + p.w * p.h, 0) / (rr.sheetW * rr.sheetH) * 100).toFixed(0);
     layoutBar = `
       <div class="layout-bar">
-        <button type="button" class="lo-nav" onclick="jumpLayout(-1)" ${gi === 0 ? 'disabled' : ''} title="上一种不同布局">‹</button>
         <div class="layout-info">
           <span class="li-main">布局 ${gi + 1}/${groups.length}　${rangesText(g.ranges)}</span>
           <span class="li-sub">${g.count > 1 ? '本布局共 ' + g.count + ' 张相同（当前第 ' + (info.posInGroup + 1) + ' 张）· ' : ''}利用率 ${eff}%</span>
         </div>
-        <button type="button" class="lo-nav" onclick="jumpLayout(1)" ${gi === groups.length - 1 ? 'disabled' : ''} title="下一种不同布局">›</button>
-        <button type="button" class="lo-overview-btn" onclick="openLayoutOverview()">布局总览</button>
+        <div class="lo-actions">
+          <button type="button" class="lo-nav" onclick="jumpLayout(-1)" ${gi === 0 ? 'disabled' : ''} title="上一种不同布局">‹</button>
+          <button type="button" class="lo-nav" onclick="jumpLayout(1)" ${gi === groups.length - 1 ? 'disabled' : ''} title="下一种不同布局">›</button>
+          <button type="button" class="lo-overview-btn" onclick="openLayoutOverview()">布局总览</button>
+        </div>
       </div>`;
   }
   area.innerHTML = `

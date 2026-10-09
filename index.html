@@ -1431,7 +1431,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.11</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.12</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4474,35 +4474,45 @@ function rowMixPack(parts, sheetW, sheetH, kerf, sortMode) {
  * 考虑锯缝的排版：将锯缝宽度加到零件尺寸上，最后从利用率中扣除锯缝面积
  */
 function packWithKerf(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
-  // 给每个零件尺寸加上锯缝（零件之间需要锯缝，边缘不需要）
-  // 简化模型：每个零件的有效占位 = 实际尺寸 + 锯缝
-  // 但这样会多算边缘的锯缝，所以在统计时修正
+  // 锯缝只存在于零件与零件之间，零件贴着板边的那一侧不需要锯缝。
+  // 做法：零件有效占位 = 实际尺寸 + 锯缝（四周都加）；排布时把板在长、宽方向各放大一个锯缝，
+  // 于是贴板边的零件可以把多出的锯缝"伸到"虚拟板边外，等价于贴边不扣锯缝；
+  // 零件相邻时两者各占半个/一个锯缝，中间仍保留完整锯缝。坐标减回后真实零件都在板内。
   const adjustedParts = parts.map(p => ({
     ...p,
     width: p.width + kerf,
     height: p.height + kerf
   }));
 
-  const result = heuristic === 'GUILLOTINE'
-    ? guillotinePack(adjustedParts, sheetW, sheetH, 0, sortMode)
-    : heuristic === 'ROW_MIX'
-    ? rowMixPack(adjustedParts, sheetW, sheetH, 0, sortMode)
-    : maxRectanglesPack(adjustedParts, sheetW, sheetH, 0, heuristic, sortMode);
+  // 排布使用的虚拟板尺寸（各方向 +kerf）
+  const packW = sheetW + kerf;
+  const packH = sheetH + kerf;
 
-  // 修正放置坐标和尺寸（减去锯缝偏移）
+  const result = heuristic === 'GUILLOTINE'
+    ? guillotinePack(adjustedParts, packW, packH, 0, sortMode)
+    : heuristic === 'ROW_MIX'
+    ? rowMixPack(adjustedParts, packW, packH, 0, sortMode)
+    : maxRectanglesPack(adjustedParts, packW, packH, 0, heuristic, sortMode);
+
+  // 还原真实板尺寸（坐标原点不变，x/y 无需改；宽高减回锯缝，贴边件正好落到板边）
+  result.sheetW = sheetW;
+  result.sheetH = sheetH;
   result.sheets.forEach(sheet => {
     sheet.forEach(p => {
       p.w = p.w - kerf;
       p.h = p.h - kerf;
+      // 数值误差兜底：夹到板内
+      p.x = Math.max(0, Math.min(p.x, sheetW));
+      p.y = Math.max(0, Math.min(p.y, sheetH));
     });
   });
 
-  // 重新计算统计（用实际零件尺寸）
+  // 重新计算统计（用实际零件尺寸、真实板尺寸）
   let totalUsed = 0;
   result.sheets.forEach(s => s.forEach(p => { totalUsed += p.w * p.h; }));
   const sheetArea = sheetW * sheetH;
   const totalSheetArea = result.sheets.length * sheetArea;
-  // 锯缝占用面积估算
+  // 锯缝占用面积估算（仅零件相邻边，近似）
   let kerfArea = 0;
   result.sheets.forEach(s => {
     s.forEach(p => {
@@ -4512,6 +4522,7 @@ function packWithKerf(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
   });
 
   result.stats.totalUsed = totalUsed;
+  result.stats.usedArea = totalUsed;
   result.stats.totalWaste = totalSheetArea - totalUsed;
   result.stats.efficiency = totalSheetArea > 0 ? (totalUsed / totalSheetArea * 100) : 0;
   result.stats.kerfArea = kerfArea;

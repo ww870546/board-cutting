@@ -1274,6 +1274,63 @@ tr.lb-manual td { background: #fff7ec; }
 @media (min-width: 769px) {
   .mobile-view-tabs { display: none !important; }
 }
+/* ===== 布局分组工具条 ===== */
+.layout-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #f6f7f9);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.layout-info { flex: 1 1 auto; min-width: 200px; display: flex; flex-direction: column; line-height: 1.35; }
+.li-main { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.li-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+.lo-nav {
+  min-width: 38px; height: 38px; font-size: 22px; line-height: 1;
+  border: 1px solid var(--border); background: var(--bg-primary);
+  border-radius: var(--radius-sm); cursor: pointer; color: var(--text-primary);
+}
+.lo-nav:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.lo-nav:disabled { opacity: .4; cursor: not-allowed; }
+.lo-overview-btn {
+  height: 38px; padding: 0 16px; font-size: 14px; font-weight: 600;
+  border: none; border-radius: var(--radius-sm); cursor: pointer;
+  background: var(--accent); color: #fff; white-space: nowrap;
+}
+.lo-overview-btn:hover { filter: brightness(1.05); }
+.sheet-tab .tab-group {
+  display: inline-block; margin-left: 6px; padding: 0 5px; font-size: 10.5px; font-weight: 700;
+  color: #fff; background: var(--accent); border-radius: 8px; vertical-align: middle;
+}
+
+/* ===== 布局总览弹窗 ===== */
+.lo-box { max-width: 920px; width: 92vw; }
+.lo-summary { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 10px; }
+.lo-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px; max-height: 68vh; overflow-y: auto; margin: 14px 0;
+}
+.lo-card {
+  border: 2px solid var(--border); border-radius: var(--radius-sm);
+  padding: 8px; cursor: pointer; background: var(--bg-primary); transition: border-color .15s;
+}
+.lo-card:hover { border-color: var(--accent); }
+.lo-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,119,34,.18); }
+.lo-thumb { background: #fafaf7; border-radius: 4px; overflow: hidden; }
+.lo-thumb svg { display: block; width: 100%; height: auto; }
+.lo-meta { padding: 6px 2px 0; }
+.lo-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.lo-count { display: inline-block; padding: 0 6px; font-size: 12px; color: #fff; background: var(--accent); border-radius: 8px; }
+.lo-range { font-size: 13px; color: var(--text-primary); margin-top: 3px; }
+.lo-eff { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+@media (max-width: 768px) {
+  .li-main { font-size: 14px; }
+  .lo-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+}
 </style>
 </head>
 <body>
@@ -1431,7 +1488,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.13</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.14</span>
     </div>
 
     <!-- 历史方案 -->
@@ -1557,6 +1614,18 @@ tr.lb-manual td { background: #fff7ec; }
     <div class="confirm-actions">
       <button class="btn btn-ghost btn-sm" id="promptCancel">取消</button>
       <button class="btn btn-primary btn-sm" id="promptOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 布局总览弹窗 -->
+<div class="confirm-modal" id="layoutOverviewModal">
+  <div class="confirm-mask" onclick="closeLayoutOverview()"></div>
+  <div class="confirm-box lo-box">
+    <div class="confirm-title">布局总览<span class="lo-summary" id="layoutOverviewSummary"></span></div>
+    <div class="lo-grid" id="layoutOverviewBody"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-primary btn-sm" onclick="closeLayoutOverview()">关闭</button>
     </div>
   </div>
 </div>
@@ -4645,6 +4714,7 @@ function runOptimization() {
     }
 
     state.results = bestResult;
+    bestResult.layoutGroups = buildLayoutGroups(bestResult.sheets);
     state.activeSheet = 0;
     boardZoom.initialized = false;   // 重新优化后需要重新自适应窗口
     renderResults();
@@ -4659,6 +4729,7 @@ function renderResults() {
   if (!state.results) return;
 
   const r = state.results;
+  if (!r.layoutGroups) r.layoutGroups = buildLayoutGroups(r.sheets);   // 兜底（如加载历史方案）
 
   // 显示统计栏
   $('statsBar').style.display = 'flex';
@@ -4671,12 +4742,16 @@ function renderResults() {
   // 渲染板材标签
   const tabsContainer = $('sheetsTabs');
   tabsContainer.style.display = 'flex';
+  // 每种布局首板 → 该布局张数（用于标签角标）
+  const firstMark = new Map();
+  (r.layoutGroups || []).forEach(g => { if (g.count > 1) firstMark.set(g.first, g.count); });
   tabsContainer.innerHTML = r.sheets.map((sheet, idx) => {
     const usedArea = sheet.reduce((sum, p) => sum + p.w * p.h, 0);
     const sheetArea = r.sheetW * r.sheetH;
     const usage = (usedArea / sheetArea * 100).toFixed(0);
+    const mark = firstMark.has(idx) ? `<span class="tab-group" title="一种布局的起始，连续 ${firstMark.get(idx)} 张相同">×${firstMark.get(idx)}</span>` : '';
     return `<button class="sheet-tab ${idx === state.activeSheet ? 'active' : ''}" onclick="switchSheet(${idx})">
-      第 ${idx + 1} 张<span class="tab-usage">${usage}%</span>
+      第 ${idx + 1} 张<span class="tab-usage">${usage}%</span>${mark}
     </button>`;
   }).join('');
 
@@ -4693,6 +4768,99 @@ function renderResults() {
 function switchSheet(idx) {
   state.activeSheet = idx;
   renderResults();
+}
+
+// ========== 排版布局自动分组（识别完全相同的板） ==========
+// 一张板的布局指纹：零件类型(名称+尺寸+旋转) + 摆放坐标，规范化后排序拼接
+function sheetSignature(sheet) {
+  return sheet.map(p => [
+    p.name, Math.round(p.w), Math.round(p.h), p.rotated ? 1 : 0,
+    Math.round(p.x), Math.round(p.y)
+  ].join('@')).sort().join('|');
+}
+
+// 把所有板按指纹归组，返回按首次出现顺序排列的分组
+function buildLayoutGroups(sheets) {
+  const map = new Map();
+  sheets.forEach((sheet, i) => {
+    const sig = sheetSignature(sheet);
+    if (!map.has(sig)) map.set(sig, { sig, first: i, list: [] });
+    map.get(sig).list.push(i);
+  });
+  const groups = [];
+  map.forEach(g => {
+    const ranges = [];
+    let s = g.list[0], prev = g.list[0];
+    for (let k = 1; k < g.list.length; k++) {
+      const v = g.list[k];
+      if (v === prev + 1) { prev = v; }
+      else { ranges.push([s, prev]); s = v; prev = v; }
+    }
+    ranges.push([s, prev]);
+    groups.push({ sig: g.sig, first: g.first, list: g.list, count: g.list.length, ranges });
+  });
+  return groups;
+}
+
+// 区间文字（1-based，连续段合并）
+function rangesText(ranges) {
+  return ranges.map(([a, b]) => a === b ? `第 ${a + 1} 张` : `第 ${a + 1}–${b + 1} 张`).join('、');
+}
+
+// 当前板所在分组及在分组中的位置
+function currentLayoutGroup() {
+  const r = state.results;
+  if (!r || !r.layoutGroups) return null;
+  const idx = state.activeSheet;
+  for (let gi = 0; gi < r.layoutGroups.length; gi++) {
+    const g = r.layoutGroups[gi];
+    const pos = g.list.indexOf(idx);
+    if (pos >= 0) return { group: g, groupIndex: gi, posInGroup: pos };
+  }
+  return null;
+}
+
+// 跳到上一种 / 下一种不同布局（落到该组第一张）
+function jumpLayout(delta) {
+  const info = currentLayoutGroup();
+  if (!info) return;
+  const groups = state.results.layoutGroups;
+  const ni = Math.max(0, Math.min(groups.length - 1, info.groupIndex + delta));
+  switchSheet(groups[ni].first);
+}
+
+// 布局总览弹窗
+function openLayoutOverview() {
+  const r = state.results;
+  if (!r || !r.layoutGroups) return;
+  const groups = r.layoutGroups;
+  const sheetArea = r.sheetW * r.sheetH;
+  const body = $('layoutOverviewBody');
+  body.innerHTML = groups.map((g, gi) => {
+    const sheet = r.sheets[g.first];
+    const used = sheet.reduce((sum, p) => sum + p.w * p.h, 0);
+    const eff = (used / sheetArea * 100).toFixed(0);
+    const active = g.list.indexOf(state.activeSheet) >= 0 ? ' active' : '';
+    return `<div class="lo-card${active}" onclick="jumpToLayoutSheet(${g.first})">
+      <div class="lo-thumb">${buildSheetSVG(g.first, 300, 150)}</div>
+      <div class="lo-meta">
+        <div class="lo-title">布局 ${gi + 1}${g.count > 1 ? ` <span class="lo-count">×${g.count}</span>` : ''}</div>
+        <div class="lo-range">${rangesText(g.ranges)}</div>
+        <div class="lo-eff">${g.count} 张 · 利用率 ${eff}%</div>
+      </div>
+    </div>`;
+  }).join('');
+  $('layoutOverviewSummary').textContent =
+    `共 ${r.sheets.length} 张板，${groups.length} 种不同布局` +
+    (groups.length < r.sheets.length ? '（相同布局已自动归并）' : '');
+  $('layoutOverviewModal').classList.add('show');
+}
+function closeLayoutOverview() {
+  $('layoutOverviewModal').classList.remove('show');
+}
+function jumpToLayoutSheet(idx) {
+  closeLayoutOverview();
+  switchSheet(idx);
 }
 
 // 构建单张板材的 SVG 排版图（屏幕展示与 PDF 导出共用）
@@ -4963,8 +5131,28 @@ function renderSheetVisualization() {
     ? 'transform:translate(' + boardZoom.tx + 'px,' + boardZoom.ty + 'px) scale(' + boardZoom.scale + ');'
     : 'visibility:hidden;';
   const levelText = keepZoom ? (Math.round(boardZoom.scale * 100) + '%') : '100%';
+  // 布局分组工具条
+  let layoutBar = '';
+  const info = currentLayoutGroup();
+  if (info) {
+    const rr = state.results;
+    const groups = rr.layoutGroups;
+    const g = info.group, gi = info.groupIndex;
+    const eff = (rr.sheets[g.first].reduce((s, p) => s + p.w * p.h, 0) / (rr.sheetW * rr.sheetH) * 100).toFixed(0);
+    layoutBar = `
+      <div class="layout-bar">
+        <button type="button" class="lo-nav" onclick="jumpLayout(-1)" ${gi === 0 ? 'disabled' : ''} title="上一种不同布局">‹</button>
+        <div class="layout-info">
+          <span class="li-main">布局 ${gi + 1}/${groups.length}　${rangesText(g.ranges)}</span>
+          <span class="li-sub">${g.count > 1 ? '本布局共 ' + g.count + ' 张相同（当前第 ' + (info.posInGroup + 1) + ' 张）· ' : ''}利用率 ${eff}%</span>
+        </div>
+        <button type="button" class="lo-nav" onclick="jumpLayout(1)" ${gi === groups.length - 1 ? 'disabled' : ''} title="下一种不同布局">›</button>
+        <button type="button" class="lo-overview-btn" onclick="openLayoutOverview()">布局总览</button>
+      </div>`;
+  }
   area.innerHTML = `
     <div class="board-zoom-wrap">
+      ${layoutBar}
       <div class="board-zoom-controls">
         <button type="button" class="zoom-btn" onclick="zoomBoard(1.25)" title="放大">＋</button>
         <button type="button" class="zoom-btn" onclick="zoomBoard(0.8)" title="缩小">－</button>

@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.15</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.16</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4763,6 +4763,19 @@ function renderResults() {
       第 ${idx + 1} 张<span class="tab-usage">${usage}%</span>${mark}
     </button>`;
   }).join('');
+
+  // 切板/跳布局后，让当前板标签自动滚动到标签栏中间（滑块跟随，例如跳到布局2时自动定位到第276张）
+  const activeTabEl = tabsContainer.querySelector('.sheet-tab.active');
+  if (activeTabEl) {
+    const centerActiveTab = () => {
+      const cr = tabsContainer.getBoundingClientRect();
+      const tr = activeTabEl.getBoundingClientRect();
+      const target = tabsContainer.scrollLeft + (tr.left - cr.left) - (cr.width - tr.width) / 2;
+      tabsContainer.scrollLeft = Math.max(0, target);
+    };
+    centerActiveTab();
+    requestAnimationFrame(centerActiveTab);
+  }
 
   // 渲染当前板材可视化
   renderSheetVisualization();

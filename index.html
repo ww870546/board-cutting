@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.17</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.18</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4450,7 +4450,98 @@ function rowMixPack(parts, sheetW, sheetH, kerf, sortMode) {
   const vPerRow = Math.floor(sheetW / vW);
   const hPerRow = canRotate ? Math.floor(sheetW / hW) : 0;
 
-  // 枚举一张板的最优行组合 (n行竖放 + m行横放)
+  // ---- 余料自由矩形轻量合并：把边对齐、恰好拼成更大矩形的两块合并 ----
+  function mergeRects(rs) {
+    const list = rs.filter(r => r.w > 1e-6 && r.h > 1e-6);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < list.length && !changed; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const a = list[i], b = list[j];
+          if (Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.w - b.w) < 1e-6) {
+            if (Math.abs(a.y + a.h - b.y) < 1e-6) { list[i] = { x: a.x, y: a.y, w: a.w, h: a.h + b.h }; list.splice(j, 1); changed = true; break; }
+            if (Math.abs(b.y + b.h - a.y) < 1e-6) { list[i] = { x: a.x, y: b.y, w: a.w, h: a.h + b.h }; list.splice(j, 1); changed = true; break; }
+          }
+          if (Math.abs(a.y - b.y) < 1e-6 && Math.abs(a.h - b.h) < 1e-6) {
+            if (Math.abs(a.x + a.w - b.x) < 1e-6) { list[i] = { x: a.x, y: a.y, w: a.w + b.w, h: a.h }; list.splice(j, 1); changed = true; break; }
+            if (Math.abs(b.x + b.w - a.x) < 1e-6) { list[i] = { x: b.x, y: a.y, w: a.w + b.w, h: a.h }; list.splice(j, 1); changed = true; break; }
+          }
+        }
+      }
+    }
+    return list;
+  }
+
+  // 在余料自由矩形内，用同尺寸零件（竖/横两种朝向都试）贪婪补件；就地写入 placed，返回新增数
+  function fillRemnant(placed, frees, limit, baseCount) {
+    const cands = [{ w: vW, h: vH, rot: false }];
+    if (canRotate) cands.push({ w: hW, h: hH, rot: true });
+    let added = 0;
+    while (baseCount + added < limit) {
+      let pick = null;
+      for (const c of cands) {
+        for (let k = 0; k < frees.length; k++) {
+          const fr = frees[k];
+          if (c.w <= fr.w + 1e-6 && c.h <= fr.h + 1e-6) {
+            const score = Math.min(fr.w - c.w, fr.h - c.h); // 短边最贴合优先
+            const key = fr.y * 1e8 + fr.x;
+            if (!pick || score < pick.score - 1e-9 || (Math.abs(score - pick.score) < 1e-9 && key < pick.key)) {
+              pick = { fr, c, score, key };
+            }
+          }
+        }
+      }
+      if (!pick) break;
+      const fr = pick.fr, c = pick.c;
+      placed.push({
+        partId: proto.id, name: proto.name, x: fr.x, y: fr.y,
+        w: c.w, h: c.h, rotated: c.rot, color: proto.color,
+        instance: baseCount + added + 1
+      });
+      const nf = [];
+      for (const g of frees) {
+        if (g === fr) {
+          if (fr.w - c.w > 1e-6) nf.push({ x: fr.x + c.w, y: fr.y, w: fr.w - c.w, h: c.h });
+          if (fr.h - c.h > 1e-6) nf.push({ x: fr.x, y: fr.y + c.h, w: fr.w, h: fr.h - c.h });
+        } else nf.push(g);
+      }
+      frees.length = 0;
+      mergeRects(nf).forEach(r => frees.push(r));
+      added++;
+    }
+    return added;
+  }
+
+  // 构建一张板：先排 n 竖行 + m 横行（整行），再把各行右侧尾条与底部余料换朝向补满
+  function buildLayout(n, m, limit) {
+    const placed = [];
+    let y = 0, idx = 0;
+    for (let r = 0; r < n && idx < limit; r++) {
+      for (let c = 0; c < vPerRow && idx < limit; c++) {
+        placed.push({ partId: proto.id, name: proto.name, x: c * vW, y: y, w: vW, h: vH, rotated: false, color: proto.color, instance: idx + 1 });
+        idx++;
+      }
+      y += vH;
+    }
+    for (let r = 0; r < m && idx < limit; r++) {
+      for (let c = 0; c < hPerRow && idx < limit; c++) {
+        placed.push({ partId: proto.id, name: proto.name, x: c * hW, y: y, w: hW, h: hH, rotated: true, color: proto.color, instance: idx + 1 });
+        idx++;
+      }
+      y += hH;
+    }
+    // 各行右侧尾条（连续同朝向行段天然是整段矩形）+ 底部余料
+    let frees = [];
+    if (n > 0 && sheetW - vPerRow * vW > 1e-6) frees.push({ x: vPerRow * vW, y: 0, w: sheetW - vPerRow * vW, h: n * vH });
+    if (m > 0 && sheetW - hPerRow * hW > 1e-6) frees.push({ x: hPerRow * hW, y: n * vH, w: sheetW - hPerRow * hW, h: m * hH });
+    if (y < sheetH - 1e-6) frees.push({ x: 0, y: y, w: sheetW, h: sheetH - y });
+    frees = mergeRects(frees);
+    if (idx < limit) fillRemnant(placed, frees, limit, idx);
+    return { placed, frees };
+  }
+
+  // 枚举 (n 竖行 + m 横行)，容量按"整行 + 余料换朝向补件"后的真实可放件数计，取容量最大（并列取占用高度最小）
   let bestCombo = null;
   const maxN = Math.floor(sheetH / vH);
   for (let n = 0; n <= maxN; n++) {
@@ -4458,76 +4549,29 @@ function rowMixPack(parts, sheetW, sheetH, kerf, sortMode) {
     const maxM = canRotate ? Math.floor(remainH / hH) : 0;
     for (let m = 0; m <= maxM; m++) {
       if (n === 0 && m === 0) continue;
-      const capacity = n * vPerRow + m * hPerRow;
-      if (capacity <= 0) continue;
+      const cap = buildLayout(n, m, totalQty).placed.length;
+      if (cap <= 0) continue;
       const usedH = n * vH + m * hH;
-      // 优先：容量≥需求量时选用量最小的；容量不足时选容量最大的
-      if (!bestCombo) { bestCombo = { n, m, capacity, usedH }; continue; }
-      const curFit = capacity >= totalQty;
-      const bestFit = bestCombo.capacity >= totalQty;
-      if (curFit && !bestFit) { bestCombo = { n, m, capacity, usedH }; }
-      else if (curFit && bestFit) {
-        if (usedH < bestCombo.usedH) bestCombo = { n, m, capacity, usedH };
-      } else if (!curFit && !bestFit) {
-        if (capacity > bestCombo.capacity) bestCombo = { n, m, capacity, usedH };
+      if (!bestCombo || cap > bestCombo.cap || (cap === bestCombo.cap && usedH < bestCombo.usedH)) {
+        bestCombo = { n, m, cap, usedH };
       }
     }
   }
 
-  if (!bestCombo || bestCombo.capacity <= 0) {
+  if (!bestCombo || bestCombo.cap <= 0) {
     return guillotinePack(parts, sheetW, sheetH, kerf, sortMode);
   }
 
-  // 生成排版：多张板，前几张按最优组合放满，最后一张放剩余
+  // 逐板开板：每张按最优组合放到容量上限，最后一张放剩余
   const sheets = [];
   const freeRects = [];
   let remaining = totalQty;
-  const perSheet = bestCombo.capacity;
-  const numFullSheets = Math.floor(remaining / perSheet);
-  const lastSheetQty = remaining % perSheet;
-
-  function buildSheet(qty) {
-    const placed = [];
-    let idx = 0;
-    let y = 0;
-    // 竖放行
-    for (let r = 0; r < bestCombo.n && idx < qty; r++) {
-      for (let c = 0; c < vPerRow && idx < qty; c++) {
-        placed.push({
-          partId: proto.id, name: proto.name, x: c * vW, y: y,
-          w: vW, h: vH, rotated: false, color: proto.color,
-          instance: idx + 1
-        });
-        idx++;
-      }
-      y += vH;
-    }
-    // 横放行
-    for (let r = 0; r < bestCombo.m && idx < qty; r++) {
-      for (let c = 0; c < hPerRow && idx < qty; c++) {
-        placed.push({
-          partId: proto.id, name: proto.name, x: c * hW, y: y,
-          w: hW, h: hH, rotated: true, color: proto.color,
-          instance: idx + 1
-        });
-        idx++;
-      }
-      y += hH;
-    }
-    // 剩余空间作为 freeRect
-    const fr = [];
-    if (y < sheetH) fr.push({ x: 0, y: y, w: sheetW, h: sheetH - y });
-    return { placed, fr };
-  }
-
-  for (let s = 0; s < numFullSheets; s++) {
-    const { placed, fr } = buildSheet(perSheet);
-    sheets.push(placed); freeRects.push(fr);
-    remaining -= perSheet;
-  }
-  if (lastSheetQty > 0) {
-    const { placed, fr } = buildSheet(lastSheetQty);
-    sheets.push(placed); freeRects.push(fr);
+  while (remaining > 0) {
+    const take = Math.min(remaining, bestCombo.cap);
+    const { placed, frees } = buildLayout(bestCombo.n, bestCombo.m, take);
+    sheets.push(placed);
+    freeRects.push(frees);
+    remaining -= take;
   }
 
   const usedArea = sheets.reduce((s, sh) => s + sh.reduce((ss, p) => ss + p.w * p.h, 0), 0);

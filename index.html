@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.18</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.19</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4007,6 +4007,113 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
       if (!placedAny) break;
     }
   }
+
+  // 基于几何碰撞的自由找位：枚举板上已有零件的边作为候选坐标，
+  // 在任意不重叠、不出界的空隙（含 L 形等不规则余料）里放置，
+  // 不依赖 guillotine 矩形空闲列表（后者只能近似规整空隙）。
+  function rebuildFree(sheetIdx) {
+    let fr = [{ x: 0, y: 0, w: sheetW, h: sheetH }];
+    for (const p of sheets[sheetIdx]) {
+      const nf = [];
+      for (const f of fr) {
+        if (p.x + p.w <= f.x + 0.01 || p.x >= f.x + f.w - 0.01 ||
+            p.y + p.h <= f.y + 0.01 || p.y >= f.y + f.h - 0.01) { nf.push(f); continue; }
+        if (p.y > f.y + 0.01) nf.push({ x: f.x, y: f.y, w: f.w, h: p.y - f.y });
+        if (p.y + p.h < f.y + f.h - 0.01) nf.push({ x: f.x, y: p.y + p.h, w: f.w, h: f.y + f.h - (p.y + p.h) });
+        if (p.x > f.x + 0.01) {
+          const ly = Math.max(f.y, p.y), lh = Math.min(f.y + f.h, p.y + p.h) - ly;
+          if (lh > 0.01) nf.push({ x: f.x, y: ly, w: p.x - f.x, h: lh });
+        }
+        if (p.x + p.w < f.x + f.w - 0.01) {
+          const ry = Math.max(f.y, p.y), rh = Math.min(f.y + f.h, p.y + p.h) - ry;
+          if (rh > 0.01) nf.push({ x: p.x + p.w, y: ry, w: f.x + f.w - (p.x + p.w), h: rh });
+        }
+      }
+      fr = nf.filter(n => n.w > 0.5 && n.h > 0.5);
+    }
+    freeRects[sheetIdx] = mergeFreeRects(fr);
+  }
+
+  function placeGeom(sheetIdx, item) {
+    const placed = sheets[sheetIdx];
+    const orients = item.rotatable
+      ? [[item.width, item.height, false], [item.height, item.width, true]]
+      : [[item.width, item.height, false]];
+    const xs = new Set([0]), ys = new Set([0]);
+    placed.forEach(p => { xs.add(p.x); xs.add(p.x + p.w); ys.add(p.y); ys.add(p.y + p.h); });
+
+    let best = null;
+    for (const [w, h, rotated] of orients) {
+      if (w > sheetW + 0.5 || h > sheetH + 0.5) continue;
+      const xlist = [...xs].filter(x => x + w <= sheetW + 0.5).sort((a, b) => a - b);
+      const ylist = [...ys].filter(y => y + h <= sheetH + 0.5).sort((a, b) => a - b);
+      for (const x of xlist) {
+        for (const y of ylist) {
+          let ok = true;
+          for (const p of placed) {
+            if (x < p.x + p.w - 0.5 && x + w > p.x + 0.5 &&
+                y < p.y + p.h - 0.5 && y + h > p.y + 0.5) { ok = false; break; }
+          }
+          if (ok) {
+            const score = y * 1000000 + x; // Bottom-Left：先靠下再靠左
+            if (!best || score < best.score) best = { x, y, w, h, rotated, score };
+          }
+        }
+      }
+    }
+    if (!best) return false;
+    placed.push({
+      x: best.x, y: best.y, w: best.w, h: best.h,
+      partId: item.partId, name: item.name, color: item.color,
+      rotated: best.rotated, instance: item.instance,
+      originalW: item.width, originalH: item.height
+    });
+    rebuildFree(sheetIdx);
+    return true;
+  }
+
+  // ================================================================
+  // 全局余料回填：把后面板上的小件尽量塞进前面各板的空闲矩形，
+  // 避免「小件单独开一张板、利用率极低」（如最后一张只放小条）。
+  // 只往空隙里加，不移动/不覆盖已有大件，前面板布局保持不变。
+  // ================================================================
+  function backfillSmallItems() {
+    for (let src = sheets.length - 1; src >= 1; src--) {
+      let moved = true;
+      while (moved) {
+        moved = false;
+        let candIdx = -1, candArea = Infinity;
+        sheets[src].forEach((p, idx) => {
+          const a = p.w * p.h;
+          if (a < candArea) { candArea = a; candIdx = idx; }
+        });
+        if (candIdx < 0) break;
+        const p = sheets[src][candIdx];
+        const srcPart = parts.find(pp => pp.id === p.partId);
+        const item = {
+          partId: p.partId, name: p.name,
+          width: p.originalW, height: p.originalH,
+          color: p.color, rotatable: srcPart ? srcPart.rotatable : true,
+          instance: p.instance
+        };
+        let done = false;
+        for (let dst = 0; dst < src; dst++) {
+          if (placeGeom(dst, item)) { done = true; break; }
+        }
+        if (done) {
+          sheets[src].splice(candIdx, 1);
+          freeRects[src].push({ x: p.x, y: p.y, w: p.w, h: p.h });
+          freeRects[src] = mergeFreeRects(freeRects[src]);
+          moved = true;
+        }
+      }
+    }
+    // 删除变空的板（从后往前）
+    for (let s = sheets.length - 1; s >= 0; s--) {
+      if (sheets[s].length === 0) { sheets.splice(s, 1); freeRects.splice(s, 1); }
+    }
+  }
+  backfillSmallItems();
 
   // 计算统计
   const sheetArea = sheetW * sheetH;

@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.20</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.21</span>
     </div>
 
     <!-- 历史方案 -->
@@ -3570,7 +3570,7 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
   //   4. 有限搜索深度：单张板最多搜索 N 个零件
   //   5. 候选排序：按面积降序尝试，更早到达高利用率，增强剪枝
   // ================================================================
-  function optimalFillSheet(itemPool) {
+  function optimalFillSheet(itemPool, nodeLimit) {
     // 返回 { placed: [...], remainingPool: [...] }
     // placed 是该板上最优布局的零件列表（含 x,y,w,h,rotated 等）
     // remainingPool 是没放到这张板上的零件索引集合
@@ -3599,9 +3599,9 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
     let bestPlacements = [];
     let bestUsedMask = 0;
     
-    // 节点数限制，防止极端情况性能爆炸
+    // 节点数限制，防止极端情况性能爆炸；尾板合并重排可传入更高上限
     let nodesVisited = 0;
-    const MAX_NODES = 200000;
+    const MAX_NODES = nodeLimit || 200000;
 
     function dfs(idx, usedMask, frees, placements, placedCount, placedArea) {
       nodesVisited++;
@@ -4193,6 +4193,81 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
     if (minX <= 10 && minY <= 10) continue;
     compactSheet(ci);
   }
+
+  // ================================================================
+  // 尾板消除（整板合并重排）：主排样是"逐板贪心 + 小件回填"，可能出现最后一张板只剩
+  // 少量零件，而倒数第二张板只要对整板零件重新布局（例如把一排整体贴到板边、利用贴板边
+  // 不扣锯缝），就能把尾板的零件也一并收下，从而少用一张板。这里在末尾把最后一张板的零件
+  // 与前面的板合并（从 1 张逐步扩大到 3 张），用 DFS 对整板做全局重排；若能排进更少的板，
+  // 且件数守恒、无重叠无越界，就替换。只在末尾、只接受不增板不丢件的结果，不动高利用率前板。
+  // ================================================================
+  function itemFromPlaced(p) {
+    const srcPart = parts.find(pp => pp.id === p.partId);
+    return {
+      partId: p.partId, name: p.name,
+      width: p.originalW, height: p.originalH,
+      color: p.color, rotatable: srcPart ? srcPart.rotatable : true,
+      instance: p.instance
+    };
+  }
+  function repackPool(pool, maxSheets) {
+    // 对给定零件池逐板做全局重排（全候选 DFS），需要的板数 ≤ maxSheets 时返回板数组，否则 null
+    const out = [];
+    let cur = pool.slice();
+    let guard = 0;
+    while (cur.length > 0) {
+      guard++;
+      if (out.length >= maxSheets || guard > 12) return null;
+      const res = optimalFillSheet(cur, 3000000);
+      if (!res.placed || res.placed.length === 0) return null;
+      out.push(res.placed);
+      cur = res.remaining.slice();
+    }
+    return out;
+  }
+  function validSheetsGeom(newSheets) {
+    for (const sh of newSheets) {
+      for (let i = 0; i < sh.length; i++) {
+        const a = sh[i];
+        if (a.x < -0.5 || a.y < -0.5 || a.x + a.w > sheetW + 0.5 || a.y + a.h > sheetH + 0.5) return false;
+        for (let j = i + 1; j < sh.length; j++) {
+          const b = sh[j];
+          if (a.x < b.x + b.w - 0.5 && a.x + a.w > b.x + 0.5 &&
+              a.y < b.y + b.h - 0.5 && a.y + a.h > b.y + 0.5) return false;
+        }
+      }
+    }
+    return true;
+  }
+  (function eliminateLastSheets() {
+    let guard = 0;
+    while (sheets.length >= 2 && guard < 8) {
+      guard++;
+      const lastIdx = sheets.length - 1;
+      let merged = false;
+      for (let k = 1; k <= Math.min(3, lastIdx); k++) {
+        const fromIdx = lastIdx - k;
+        const partItems = [];
+        for (let s = fromIdx; s <= lastIdx; s++) {
+          sheets[s].forEach(p => partItems.push(itemFromPlaced(p)));
+        }
+        // DFS 用 Number 位掩码（1<<idx），合并件数超过 30 会溢出，跳过
+        if (partItems.length === 0 || partItems.length > 30) continue;
+        const repacked = repackPool(partItems, k);
+        if (!repacked || repacked.length > k) continue;
+        const newCount = repacked.reduce((a, sh) => a + sh.length, 0);
+        if (newCount !== partItems.length) continue;
+        if (!validSheetsGeom(repacked)) continue;
+        // 用重排结果替换 fromIdx..lastIdx（k+1 张）为 repacked（≤k 张）
+        sheets.splice(fromIdx, k + 1, ...repacked);
+        freeRects.splice(fromIdx, k + 1, ...repacked.map(() => null));
+        for (let s = fromIdx; s < fromIdx + repacked.length; s++) rebuildFree(s);
+        merged = true;
+        break;
+      }
+      if (!merged) break;
+    }
+  })();
 
   // 计算统计
   const sheetArea = sheetW * sheetH;

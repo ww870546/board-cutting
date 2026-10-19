@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.19</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.20</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4114,6 +4114,85 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
     }
   }
   backfillSmallItems();
+
+  // ================================================================
+  // 板内紧凑归位：回填后可能出现"稀疏尾板上零件飘在中间/右侧"（如最后一张板只剩
+  // 一个小条却落在板中央）。对每张板按面积降序清空后用几何 BL 重新依次放回，
+  // 让零件贴左上角、排列整齐；仅当全部件都能放回（件数不减少）才接受，否则回退，
+  // 保证不丢件、不增板、不破坏高利用率板的布局。
+  // ================================================================
+  function compactSheet(sheetIdx) {
+    const sh = sheets[sheetIdx];
+    if (sh.length <= 1) {
+      if (sh.length === 1) { sh[0].x = 0; sh[0].y = 0; }
+      return;
+    }
+    const backup = sh.map(p => ({ ...p }));
+    const sorted = backup.slice().sort((a, b) => (b.originalW * b.originalH) - (a.originalW * a.originalH));
+    const trial = [];
+    sheets[sheetIdx] = trial;
+    let ok = true;
+    for (const b of sorted) {
+      const srcPart = parts.find(pp => pp.id === b.partId);
+      const item = {
+        partId: b.partId, name: b.name,
+        width: b.originalW, height: b.originalH,
+        color: b.color, rotatable: srcPart ? srcPart.rotatable : true,
+        instance: b.instance
+      };
+      if (!placeGeomInto(trial, item)) { ok = false; break; }
+    }
+    if (ok && trial.length === backup.length) {
+      rebuildFree(sheetIdx);
+    } else {
+      sheets[sheetIdx] = backup;
+      rebuildFree(sheetIdx);
+    }
+  }
+  // 在指定（可能被清空的）板上做几何 BL 放回（不依赖 sheets 全局）
+  function placeGeomInto(placed, item) {
+    const orients = item.rotatable
+      ? [[item.width, item.height, false], [item.height, item.width, true]]
+      : [[item.width, item.height, false]];
+    const xs = new Set([0]), ys = new Set([0]);
+    placed.forEach(p => { xs.add(p.x); xs.add(p.x + p.w); ys.add(p.y); ys.add(p.y + p.h); });
+    let best = null;
+    for (const [w, h, rotated] of orients) {
+      if (w > sheetW + 0.5 || h > sheetH + 0.5) continue;
+      const xlist = [...xs].filter(x => x + w <= sheetW + 0.5).sort((a, b) => a - b);
+      const ylist = [...ys].filter(y => y + h <= sheetH + 0.5).sort((a, b) => a - b);
+      for (const x of xlist) for (const y of ylist) {
+        let ok = true;
+        for (const p of placed) {
+          if (x < p.x + p.w - 0.5 && x + w > p.x + 0.5 &&
+              y < p.y + p.h - 0.5 && y + h > p.y + 0.5) { ok = false; break; }
+        }
+        if (ok) {
+          const score = y * 1000000 + x;
+          if (!best || score < best.score) best = { x, y, w, h, rotated, score };
+        }
+      }
+    }
+    if (!best) return false;
+    placed.push({
+      x: best.x, y: best.y, w: best.w, h: best.h,
+      partId: item.partId, name: item.name, color: item.color,
+      rotated: best.rotated, instance: item.instance,
+      originalW: item.width, originalH: item.height
+    });
+    return true;
+  }
+  // 只对"件数很少(≤4)且没有贴左上角"的稀疏板（典型即只剩一两个小件却飘在中间的尾板）
+  // 做归位；密集板与已贴角的板一律不动，保持其 guillotine 顺刀布局与利用率。
+  const order = sheets.map((s, i) => i).sort((a, b) => sheets[a].length - sheets[b].length);
+  for (const ci of order) {
+    const sh = sheets[ci];
+    if (sh.length === 0 || sh.length > 4) continue;
+    let minX = Infinity, minY = Infinity;
+    sh.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); });
+    if (minX <= 10 && minY <= 10) continue;
+    compactSheet(ci);
+  }
 
   // 计算统计
   const sheetArea = sheetW * sheetH;

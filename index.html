@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.22</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.23</span>
     </div>
 
     <!-- 历史方案 -->
@@ -3614,6 +3614,8 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
         bestArea = placedArea;
         bestPlacements = placements.slice();
         bestUsedMask = usedMask;
+        // 已把全部零件放下：这就是单板最优目标（板数/件数已满），立即停止搜索
+        if (placedCount === n) { nodesVisited = MAX_NODES + 1; return; }
       }
 
       // 边界剪枝：剩余零件数不够超越最优
@@ -4269,7 +4271,7 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
     }
   })();
 
-  (function concentrateTailItems() {
+  if (window.__postConcentrate !== false) (function concentrateTailItems() {
     if (sheets.length < 2) return;
     const lastIdx = sheets.length - 1;
     let guard = 0;
@@ -4286,7 +4288,7 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
       const pool = sheets[lastIdx].map(itemFromPlaced);
       pool.push(itemFromPlaced(cand.p));
       if (pool.length > 48) break;
-      const res = optimalFillSheet(pool, 3000000);
+      const res = optimalFillSheet(pool, 120000);
       if (!res || res.placed.length !== pool.length ||
           (res.remaining && res.remaining.length !== 0)) break;
       if (!validSheetsGeom([res.placed])) break;
@@ -5142,15 +5144,17 @@ function runOptimization() {
       // 3) 最大余料块相同时，选碎片数量更少的方案。
       const heuristics = ['COM', 'BSSF', 'BLSF', 'BAF', 'BL', 'GUILLOTINE', 'ROW_MIX'];
       const sortModes = ['area', 'longSide', 'width', 'height', 'perimeter'];
-      const results = [];
+      // 第一轮：快速择优，先关闭末板小件集中（避免对每个候选都跑昂贵的全候选重排）
+      window.__postConcentrate = false;
+      const entries = [];
       for (const h of heuristics) {
-        for (const s of sortModes) {
-          results.push(packWithKerf(effParts, sheetW, sheetH, kerf, h, s));
+        for (const sm of sortModes) {
+          entries.push({ r: packWithKerf(effParts, sheetW, sheetH, kerf, h, sm), h, sm });
         }
       }
-      const bestEff = Math.max(...results.map(r => r.stats.efficiency));
+      const bestEff = Math.max(...entries.map(e => e.r.stats.efficiency));
       // 利用率在最高值 ±0.5% 之内的方案进入决赛圈
-      const finalists = results.filter(r => r.stats.efficiency >= bestEff - 0.5);
+      const finalists = entries.filter(e => e.r.stats.efficiency >= bestEff - 0.5);
 
       function maxFreeBlockArea(result) {
         let max = 0;
@@ -5171,15 +5175,20 @@ function runOptimization() {
         return n;
       }
 
-      bestResult = finalists[0];
-      for (const r of finalists) {
-        if (maxFreeBlockArea(r) > maxFreeBlockArea(bestResult)) {
-          bestResult = r;
-        } else if (maxFreeBlockArea(r) === maxFreeBlockArea(bestResult) && totalFragments(r) < totalFragments(bestResult)) {
-          bestResult = r;
+      let bestEntry = finalists[0];
+      for (const e of finalists) {
+        if (maxFreeBlockArea(e.r) > maxFreeBlockArea(bestEntry.r)) {
+          bestEntry = e;
+        } else if (maxFreeBlockArea(e.r) === maxFreeBlockArea(bestEntry.r) && totalFragments(e.r) < totalFragments(bestEntry.r)) {
+          bestEntry = e;
         }
       }
+      // 第二轮：只对最终胜出的方案跑一次末板小件集中（整排贴边+蓝框填条），
+      // 既贴合下料手势，又把昂贵的重排限制为一次，避免页面长时间无响应
+      window.__postConcentrate = true;
+      bestResult = packWithKerf(effParts, sheetW, sheetH, kerf, bestEntry.h, bestEntry.sm);
     } else {
+      window.__postConcentrate = true;
       bestResult = packWithKerf(effParts, sheetW, sheetH, kerf, strategy, 'area');
     }
 

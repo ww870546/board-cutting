@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.21</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.22</span>
     </div>
 
     <!-- 历史方案 -->
@@ -3597,7 +3597,7 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
     let bestCount = 0;
     let bestArea = 0;
     let bestPlacements = [];
-    let bestUsedMask = 0;
+    let bestUsedMask = 0n;
     
     // 节点数限制，防止极端情况性能爆炸；尾板合并重排可传入更高上限
     let nodesVisited = 0;
@@ -3637,7 +3637,7 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
       if (idx > 0) {
         const prevIdx = indices[idx - 1];
         const prev = itemPool[prevIdx];
-        if (!(usedMask & (1 << (idx - 1))) && // 前一个也没放
+        if (!(usedMask & (1n << BigInt(idx - 1))) && // 前一个也没放
             prev.width === item.width && prev.height === item.height) {
           skip = true; // 同尺寸且前一个没放，当前也跳过（去重）
         }
@@ -3739,7 +3739,7 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
         };
 
         placements.push(placement);
-        dfs(idx + 1, usedMask | (1 << idx), merged, placements,
+        dfs(idx + 1, usedMask | (1n << BigInt(idx)), merged, placements,
             placedCount + 1, placedArea + pw * ph);
         placements.pop();
 
@@ -3816,13 +3816,13 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
 
     // 启动搜索
     const initialFrees = [{ x: 0, y: 0, w: sheetW, h: sheetH }];
-    dfs(0, 0, initialFrees, [], 0, 0);
+    dfs(0, 0n, initialFrees, [], 0, 0);
 
     // 收集结果：放置的零件 + 剩余零件
     const placed = bestPlacements;
     const remaining = [];
     for (let i = 0; i < n; i++) {
-      if (!(bestUsedMask & (1 << i))) {
+      if (!(bestUsedMask & (1n << BigInt(i)))) {
         remaining.push(itemPool[indices[i]]);
       }
     }
@@ -4266,6 +4266,178 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
         break;
       }
       if (!merged) break;
+    }
+  })();
+
+  (function concentrateTailItems() {
+    if (sheets.length < 2) return;
+    const lastIdx = sheets.length - 1;
+    let guard = 0;
+    while (guard < 48) {
+      guard++;
+      let cand = null;
+      for (let s = lastIdx - 1; s >= 0; s--) {
+        for (const p of sheets[s]) {
+          const a = p.originalW * p.originalH;
+          if (!cand || a < cand.area) cand = { src: s, p: p, area: a };
+        }
+      }
+      if (!cand) break;
+      const pool = sheets[lastIdx].map(itemFromPlaced);
+      pool.push(itemFromPlaced(cand.p));
+      if (pool.length > 48) break;
+      const res = optimalFillSheet(pool, 3000000);
+      if (!res || res.placed.length !== pool.length ||
+          (res.remaining && res.remaining.length !== 0)) break;
+      if (!validSheetsGeom([res.placed])) break;
+      sheets[cand.src].splice(sheets[cand.src].indexOf(cand.p), 1);
+      sheets[lastIdx] = res.placed;
+      rebuildFree(lastIdx);
+      rebuildFree(cand.src);
+    }
+    // ===== 末板精排：水平排整体右贴板边 + 小条坐标网格归位（含"蓝框"） =====
+    // 贴合实际下料习惯：把不贴左板边、右侧有余量的整排大件向右推到板边（贴边不扣锯缝），
+    // 释放左侧连续空位；再把最小规格的窄条按"先横后竖、左上角优先"用坐标网格逐个填回，
+    // 从而能识别 MaxRects 自由矩形分割不到的夹缝位置（如大板下方的 300 宽蓝框）。
+    // 只在"窄条数量不减少、无重叠、无越界"时接受，否则保持原排样，板数严格不增。
+    (function refineTailSheet(li) {
+      const sh = sheets[li];
+      if (sh.length < 3) return;
+      let minArea = Infinity;
+      sh.forEach(p => { const a = p.originalW * p.originalH; if (a < minArea) minArea = a; });
+      const isSmall = p => (p.originalW * p.originalH) <= minArea + 0.5;
+      const smalls = sh.filter(isSmall);
+      if (smalls.length === 0 || smalls.length >= sh.length) return;
+      const nSmall = smalls.length;
+      // 窄条长边水平（横放）/短边水平（竖放）的补偿尺寸
+      // originalW/originalH 在本排样闭包内已是补偿尺寸（实际尺寸+锯缝），直接使用
+      let hw = Math.max(smalls[0].originalW, smalls[0].originalH);
+      let hh = Math.min(smalls[0].originalW, smalls[0].originalH);
+      const clone = p => ({ partId: p.partId, name: p.name, x: p.x, y: p.y, w: p.w, h: p.h,
+        color: p.color, instance: p.instance, originalW: p.originalW, originalH: p.originalH, rotated: p.rotated });
+      let bigArr = sh.filter(p => !isSmall(p)).map(clone);
+
+      const gkey = p => p.x.toFixed(1) + "," + p.y.toFixed(1) + "," + p.w.toFixed(1) + "," + p.h.toFixed(1);
+      function collide(a, arr, keys) {
+        for (let i = 0; i < arr.length; i++) { const p = arr[i];
+          if (keys && keys[gkey(p)]) continue;
+          if (a.x < p.x + p.w - 0.01 && a.x + a.w > p.x + 0.01 &&
+              a.y < p.y + p.h - 0.01 && a.y + a.h > p.y + 0.01) return true;
+        }
+        return false;
+      }
+      function blPlace(placed, w, h) {
+        const xs = new Set([0]), ys = new Set([0]);
+        placed.forEach(p => { xs.add(p.x); xs.add(p.x + p.w); ys.add(p.y); ys.add(p.y + p.h); });
+        const ax = [...xs].sort((a, b) => a - b), ay = [...ys].sort((a, b) => a - b);
+        let best = null;
+        for (const y of ay) for (const x of ax) {
+          if (x + w > sheetW + 0.01 || y + h > sheetH + 0.01) continue;
+          if (!collide({ x, y, w, h }, placed, null)) {
+            const sc = y * 1000000 + x;
+            if (!best || sc < best.sc) best = { x, y, sc };
+          }
+        }
+        return best;
+      }
+      function fill(arr) {
+        const placed = arr.map(clone);
+        const res = [];
+        for (let i = 0; i < nSmall; i++) {
+          const r = blPlace(placed, hw, hh);
+          if (!r) break;
+          placed.push({ x: r.x, y: r.y, w: hw, h: hh }); res.push({ x: r.x, y: r.y, w: hw, h: hh, rot: false });
+        }
+        for (let i = res.length; i < nSmall; i++) {
+          const r = blPlace(placed, hh, hw);
+          if (!r) break;
+          placed.push({ x: r.x, y: r.y, w: hh, h: hw }); res.push({ x: r.x, y: r.y, w: hh, h: hw, rot: true });
+        }
+        return res;
+      }
+      function rowSegments(arr) {
+        const map = {};
+        arr.forEach(p => { const k = Math.round(p.y); (map[k] = map[k] || []).push(p); });
+        const out = [];
+        for (const k in map) {
+          const row = map[k].sort((a, b) => a.x - b.x);
+          let seg = [];
+          const flush = () => {
+            if (!seg.length) return;
+            const l = Math.min(...seg.map(p => p.x));
+            const r = Math.max(...seg.map(p => p.x + p.w));
+            if (l > 0.01 && r < sheetW - 0.01) {
+              const d = sheetW - r, keys = {};
+              seg.forEach(p => { keys[gkey(p)] = 1; });
+              const ok = seg.every(p => !collide({ x: p.x + d, y: p.y, w: p.w, h: p.h }, arr, keys));
+              if (ok) out.push({ keys, d });
+            }
+            seg = [];
+          };
+          row.forEach(p => {
+            if (!seg.length) seg.push(p);
+            else { const pr = seg[seg.length - 1];
+              if (p.x - (pr.x + pr.w) <= 4.5) seg.push(p); else { flush(); seg.push(p); } }
+          });
+          flush();
+        }
+        return out;
+      }
+      // 目标驱动：仅当右移某排能让更多窄条填回时才接受该右移
+      let cur = fill(bigArr);
+      for (let it = 0; it < 12; it++) {
+        let best = null;
+        for (const sg of rowSegments(bigArr)) {
+          const trial = bigArr.map(clone);
+          trial.forEach(p => { if (sg.keys[gkey(p)]) p.x += sg.d; });
+          let bad = false;
+          for (let i = 0; i < trial.length; i++) for (let j = i + 1; j < trial.length; j++) {
+            const a = trial[i], b = trial[j];
+            if (a.x < b.x + b.w - 0.01 && a.x + a.w > b.x + 0.01 &&
+                a.y < b.y + b.h - 0.01 && a.y + a.h > b.y + 0.01) bad = true;
+          }
+          if (bad) continue;
+          const r2 = fill(trial);
+          if (r2.length > cur.length && (!best || r2.length > best.r.length)) best = { t: trial, r: r2 };
+        }
+        if (!best) break;
+        bigArr = best.t; cur = best.r;
+      }
+      if (cur.length !== nSmall) return; // 窄条填不全，放弃精排
+      // 组装新布局
+      const out = bigArr.map(clone);
+      const proto = smalls[0];
+      cur.forEach(c => {
+        const horiz = (c.w >= c.h);
+        out.push({
+          partId: proto.partId, name: proto.name, x: c.x, y: c.y, w: c.w, h: c.h,
+          color: proto.color, instance: 0, originalW: proto.originalW, originalH: proto.originalH,
+          rotated: horiz ? (proto.originalW >= proto.originalH ? false : true)
+                        : (proto.originalW < proto.originalH ? false : true)
+        });
+      });
+      // 几何校验：数量、越界、重叠
+      if (out.length !== sh.length) return;
+      for (const p of out) {
+        if (p.x < -0.5 || p.y < -0.5 || p.x + p.w > sheetW + 0.5 || p.y + p.h > sheetH + 0.5) return;
+      }
+      for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
+        const a = out[i], b = out[j];
+        if (a.x < b.x + b.w - 0.01 && a.x + a.w > b.x + 0.01 &&
+            a.y < b.y + b.h - 0.01 && a.y + a.h > b.y + 0.01) return;
+      }
+      // 按 partId 守恒校验
+      const cnt = {};
+      sh.forEach(p => { cnt[p.partId] = (cnt[p.partId] || 0) + 1; });
+      const cnt2 = {};
+      out.forEach(p => { cnt2[p.partId] = (cnt2[p.partId] || 0) + 1; });
+      for (const k in cnt) if (cnt[k] !== cnt2[k]) return;
+      sheets[li] = out;
+      rebuildFree(li);
+    })(lastIdx);
+
+    for (let s = sheets.length - 1; s >= 0; s--) {
+      if (sheets[s].length === 0) { sheets.splice(s, 1); freeRects.splice(s, 1); }
     }
   })();
 

@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.23</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.24</span>
     </div>
 
     <!-- 历史方案 -->
@@ -4250,11 +4250,17 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
       for (let k = 1; k <= Math.min(3, lastIdx); k++) {
         const fromIdx = lastIdx - k;
         const partItems = [];
+        let poolArea = 0;
         for (let s = fromIdx; s <= lastIdx; s++) {
-          sheets[s].forEach(p => partItems.push(itemFromPlaced(p)));
+          sheets[s].forEach(p => { const it = itemFromPlaced(p); partItems.push(it); poolArea += it.width * it.height; });
         }
-        // DFS 用 Number 位掩码（1<<idx），合并件数超过 30 会溢出，跳过
-        if (partItems.length === 0 || partItems.length > 30) continue;
+        // 件数上限：快速择优阶段（第一轮）只处理 ≤30 件的小池；最终结果阶段
+        // 放宽到 72 件（BigInt 位掩码支持 >30 件），可把最后 3~4 板的大件一并重排，
+        // 修复"加几个小条就多开一板、前面板空位没填"的局部最优
+        const sizeLimit = (window.__postConcentrate === false) ? 30 : 72;
+        if (partItems.length === 0 || partItems.length > sizeLimit) continue;
+        // 面积预检：件池总面积超过 k 张虚拟板容量，理论上装不下，直接跳过（避免昂贵DFS）
+        if (poolArea > k * sheetW * sheetH + 1) continue;
         const repacked = repackPool(partItems, k);
         if (!repacked || repacked.length > k) continue;
         const newCount = repacked.reduce((a, sh) => a + sh.length, 0);
@@ -4274,6 +4280,12 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
   if (window.__postConcentrate !== false) (function concentrateTailItems() {
     if (sheets.length < 2) return;
     const lastIdx = sheets.length - 1;
+    // 只集中"规格最小的一类件"（如 300×68 小条），不挪大件：
+    // 否则大件被挪到末板却没减板，反而让源板剩余件偏离左上角（贴左上是下料硬要求）
+    let minItemArea = Infinity;
+    for (let s = 0; s < lastIdx; s++) sheets[s].forEach(p => {
+      const a = p.originalW * p.originalH; if (a < minItemArea) minItemArea = a;
+    });
     let guard = 0;
     while (guard < 48) {
       guard++;
@@ -4281,6 +4293,7 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
       for (let s = lastIdx - 1; s >= 0; s--) {
         for (const p of sheets[s]) {
           const a = p.originalW * p.originalH;
+          if (a > minItemArea + 0.5) continue;   // 只挑最小件，大件不挪
           if (!cand || a < cand.area) cand = { src: s, p: p, area: a };
         }
       }
@@ -4293,6 +4306,16 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
           (res.remaining && res.remaining.length !== 0)) break;
       if (!validSheetsGeom([res.placed])) break;
       sheets[cand.src].splice(sheets[cand.src].indexOf(cand.p), 1);
+      // 源板剩余件重新 BL 重排贴左上（挪件后留下的件可能停在非左上坐标）
+      if (sheets[cand.src].length > 0) {
+        const srcPool = sheets[cand.src].map(itemFromPlaced);
+        const srcRes = optimalFillSheet(srcPool, 120000);
+        if (srcRes && srcRes.placed.length === srcPool.length &&
+            (!srcRes.remaining || srcRes.remaining.length === 0) &&
+            validSheetsGeom([srcRes.placed])) {
+          sheets[cand.src] = srcRes.placed;
+        }
+      }
       sheets[lastIdx] = res.placed;
       rebuildFree(lastIdx);
       rebuildFree(cand.src);

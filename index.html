@@ -1497,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.24</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.25</span>
     </div>
 
     <!-- 历史方案 -->
@@ -3816,9 +3816,51 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
       return result;
     }
 
-    // 启动搜索
+    // 启动搜索：先用一个快速贪心（BL、面积降序）得到初始解，若贪心就全放则直接返回；
+    // 否则把它作为 DFS 的初始下界（bestCount/bestArea），显著增强剪枝、加速搜索
+    function greedyInit() {
+      const placed = [];
+      const usedArr = new Array(n).fill(false);
+      let area = 0;
+      function blFind(w, h) {
+        const xs = new Set([0]), ys = new Set([0]);
+        placed.forEach(p => { xs.add(p.x); xs.add(p.x + p.w); ys.add(p.y); ys.add(p.y + p.h); });
+        const ax = [...xs].sort((a, b) => a - b), ay = [...ys].sort((a, b) => a - b);
+        let best = null;
+        for (const y of ay) for (const x of ax) {
+          if (x + w > sheetW + 0.01 || y + h > sheetH + 0.01) continue;
+          let hit = false;
+          for (const p of placed) {
+            if (x < p.x + p.w - 0.01 && x + w > p.x + 0.01 &&
+                y < p.y + p.h - 0.01 && y + h > p.y + 0.01) { hit = true; break; }
+          }
+          if (!hit) { const sc = y * 1000000 + x; if (!best || sc < best.sc) best = { x, y, sc }; }
+        }
+        return best;
+      }
+      for (let i = 0; i < n; i++) {
+        const item = itemPool[indices[i]];
+        const opts = item.rotatable !== false
+          ? [{ w: item.width, h: item.height, r: false }, { w: item.height, h: item.width, r: true }]
+          : [{ w: item.width, h: item.height, r: false }];
+        let got = null;
+        for (const o of opts) { const f = blFind(o.w, o.h); if (f) { got = { x: f.x, y: f.y, w: o.w, h: o.h, r: o.r }; break; } }
+        if (got) {
+          placed.push({ partId: item.partId, name: item.name, x: got.x, y: got.y, w: got.w, h: got.h,
+            rotated: got.r, color: item.color, instance: item.instance,
+            originalW: item.width, originalH: item.height });
+          usedArr[i] = true; area += got.w * got.h;
+        }
+      }
+      let mask = 0n;
+      for (let i = 0; i < n; i++) if (usedArr[i]) mask |= (1n << BigInt(i));
+      return { placed, mask, count: placed.length, area };
+    }
     const initialFrees = [{ x: 0, y: 0, w: sheetW, h: sheetH }];
-    dfs(0, 0n, initialFrees, [], 0, 0);
+    const g0 = greedyInit();
+    bestCount = g0.count; bestArea = g0.area; bestPlacements = g0.placed; bestUsedMask = g0.mask;
+    if (bestCount === n) { nodesVisited = MAX_NODES + 1; }
+    else { dfs(0, 0n, initialFrees, [], 0, 0); }
 
     // 收集结果：放置的零件 + 剩余零件
     const placed = bestPlacements;
@@ -4212,6 +4254,35 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
       instance: p.instance
     };
   }
+  // 用主排样路径做纯贪心（不做后处理）：聚合 cur 为 parts，逐个 heuristic 试，
+  // 能在 ≤maxSheets 板内全放则返回板数组，否则 null。比独立复刻的 greedyPackOneSheet 更可靠
+  function greedyViaMain(cur, maxSheets) {
+    const map = {};
+    cur.forEach(p => {
+      const kk = p.partId + '_' + p.width + 'x' + p.height;
+      if (!map[kk]) map[kk] = { id: p.partId, name: p.name, width: p.width, height: p.height,
+        qty: 0, rotatable: p.rotatable, color: p.color };
+      map[kk].qty++;
+    });
+    const pp = Object.keys(map).map(k => map[k]);
+    const heurs = [heuristic, 'COM', 'BSSF', 'BLSF', 'BAF', 'BL'];
+    const seen = {}, list = [];
+    heurs.forEach(h => { if (h && !seen[h]) { seen[h] = 1; list.push(h); } });
+    window.__noPostProcess = true;
+    try {
+      for (const h of list) {
+        const r = maxRectanglesPack(pp, sheetW, sheetH, 0, h, 'area');
+        if (r && r.sheets.length <= maxSheets) {
+          let total = 0;
+          r.sheets.forEach(s => { total += s.length; });
+          if (total === cur.length) return r.sheets;
+        }
+      }
+    } finally {
+      window.__noPostProcess = false;
+    }
+    return null;
+  }
   function repackPool(pool, maxSheets) {
     // 对给定零件池逐板做全局重排（全候选 DFS），需要的板数 ≤ maxSheets 时返回板数组，否则 null
     const out = [];
@@ -4220,8 +4291,31 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
     while (cur.length > 0) {
       guard++;
       if (out.length >= maxSheets || guard > 12) return null;
-      const res = optimalFillSheet(cur, 3000000);
+      // 先用主排样路径纯贪心（不回溯、不做后处理）：能在剩余板数内全放则直接用，省去 DFS
+      const sheetsLeft0 = maxSheets - out.length;
+      const gm = greedyViaMain(cur, sheetsLeft0);
+      if (gm) {
+        for (const sh of gm) out.push(sh);
+        cur = [];
+        break;
+      }
+      // 贪心不全放，用 DFS 全候选；节点预算：最后一板高密时直接大节点
+      let curArea = 0;
+      cur.forEach(p => { curArea += p.width * p.height; });
+      const sheetsLeft = maxSheets - out.length;
+      const dense = curArea > sheetW * sheetH * 0.94;
+      let res = optimalFillSheet(cur, (sheetsLeft === 1 && dense) ? 12000000 : 3000000);
       if (!res.placed || res.placed.length === 0) return null;
+      // 中节点跑完仍差少量（≤4 件）且总面积在一板内时，加大节点补一次
+      if (res.remaining.length > 0 && res.remaining.length <= 4) {
+        let remArea = 0, placedArea = 0;
+        res.remaining.forEach(p => { remArea += p.width * p.height; });
+        res.placed.forEach(p => { placedArea += p.w * p.h; });
+        if (placedArea + remArea <= sheetW * sheetH + 1) {
+          const res2 = optimalFillSheet(cur, 12000000);
+          if (res2.placed.length > res.placed.length) res = res2;
+        }
+      }
       out.push(res.placed);
       cur = res.remaining.slice();
     }
@@ -4241,7 +4335,9 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
     }
     return true;
   }
-  (function eliminateLastSheets() {
+  // _noPost：纯贪心模式（repackPool 快速试）时跳过全部后处理（eliminate/concentrate/backfill/refine）
+  const _noPost = window.__noPostProcess === true;
+  if (!_noPost) (function eliminateLastSheets() {
     let guard = 0;
     while (sheets.length >= 2 && guard < 8) {
       guard++;
@@ -4277,7 +4373,7 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
     }
   })();
 
-  if (window.__postConcentrate !== false) (function concentrateTailItems() {
+  if (!_noPost && window.__postConcentrate !== false) (function concentrateTailItems() {
     if (sheets.length < 2) return;
     const lastIdx = sheets.length - 1;
     // 只集中"规格最小的一类件"（如 300×68 小条），不挪大件：
@@ -4463,6 +4559,145 @@ function maxRectanglesPack(parts, sheetW, sheetH, kerf, heuristic, sortMode) {
 
     for (let s = sheets.length - 1; s >= 0; s--) {
       if (sheets[s].length === 0) { sheets.splice(s, 1); freeRects.splice(s, 1); }
+    }
+  })();
+
+  // 纯小条板回填：concentrate 把小条集中后，若出现"整张板只放小条"（如 32 个小条单独
+  // 占第 9 板），而前面板整排右贴板边后还有网格缝隙（如大板下方的 300 宽蓝框），就把
+  // 小条逐个填回前面板，消除多余板。只在全部填得下、无重叠越界时接受，板数严格不增。
+  if (!_noPost && window.__postConcentrate !== false) (function backfillSmallToFront() {
+    if (sheets.length < 2) return;
+    let minArea = Infinity;
+    sheets.forEach(s => s.forEach(p => {
+      const a = p.originalW * p.originalH; if (a < minArea) minArea = a;
+    }));
+    const isSmall = p => p.originalW * p.originalH <= minArea + 0.5;
+    const pureIdx = [];
+    sheets.forEach((s, i) => { if (s.length > 0 && s.every(isSmall)) pureIdx.push(i); });
+    if (pureIdx.length === 0) return;
+    let toPlace = [];
+    pureIdx.forEach(i => sheets[i].forEach(p => toPlace.push({
+      partId: p.partId, name: p.name, color: p.color,
+      originalW: p.originalW, originalH: p.originalH })));
+    if (toPlace.length === 0) return;
+    let hw = 0, hh = 0;
+    sheets.forEach(s => s.forEach(p => { if (isSmall(p)) {
+      hw = Math.max(p.originalW, p.originalH); hh = Math.min(p.originalW, p.originalH); } }));
+    const clone = p => ({ partId: p.partId, name: p.name, x: p.x, y: p.y, w: p.w, h: p.h,
+      color: p.color, originalW: p.originalW, originalH: p.originalH,
+      instance: p.instance, rotated: p.rotated });
+    const gkey = p => p.x.toFixed(1) + "," + p.y.toFixed(1) + "," + p.w.toFixed(1) + "," + p.h.toFixed(1);
+    function collide(a, arr, keys) {
+      for (let i = 0; i < arr.length; i++) { const p = arr[i];
+        if (keys && keys[gkey(p)]) continue;
+        if (a.x < p.x + p.w - 0.01 && a.x + a.w > p.x + 0.01 &&
+            a.y < p.y + p.h - 0.01 && a.y + a.h > p.y + 0.01) return true;
+      }
+      return false;
+    }
+    function blPlace(placed, w, h) {
+      const xs = new Set([0]), ys = new Set([0]);
+      placed.forEach(p => { xs.add(p.x); xs.add(p.x + p.w); ys.add(p.y); ys.add(p.y + p.h); });
+      const ax = [...xs].sort((a, b) => a - b), ay = [...ys].sort((a, b) => a - b);
+      let best = null;
+      for (const y of ay) for (const x of ax) {
+        if (x + w > sheetW + 0.01 || y + h > sheetH + 0.01) continue;
+        if (!collide({ x, y, w, h }, placed, null)) {
+          const sc = y * 1000000 + x;
+          if (!best || sc < best.sc) best = { x, y, sc };
+        }
+      }
+      return best;
+    }
+    function fillMax(arr) {
+      const placed = arr.map(clone), res = [];
+      while (true) {
+        let r = blPlace(placed, hw, hh);
+        if (r) { placed.push({ x: r.x, y: r.y, w: hw, h: hh }); res.push({ x: r.x, y: r.y, w: hw, h: hh }); continue; }
+        r = blPlace(placed, hh, hw);
+        if (r) { placed.push({ x: r.x, y: r.y, w: hh, h: hw }); res.push({ x: r.x, y: r.y, w: hh, h: hw }); continue; }
+        break;
+      }
+      return res;
+    }
+    function rowSegments(arr) {
+      const map = {};
+      arr.forEach(p => { const k = Math.round(p.y); (map[k] = map[k] || []).push(p); });
+      const out = [];
+      for (const k in map) {
+        const row = map[k].sort((a, b) => a.x - b.x);
+        let seg = [];
+        const flush = () => {
+          if (!seg.length) return;
+          const l = Math.min(...seg.map(p => p.x));
+          const r = Math.max(...seg.map(p => p.x + p.w));
+          if (l > 0.01 && r < sheetW - 0.01) {
+            const d = sheetW - r, keys = {};
+            seg.forEach(p => { keys[gkey(p)] = 1; });
+            if (seg.every(p => !collide({ x: p.x + d, y: p.y, w: p.w, h: p.h }, arr, keys))) out.push({ keys, d });
+          }
+          seg = [];
+        };
+        row.forEach(p => {
+          if (!seg.length) seg.push(p);
+          else { const pr = seg[seg.length - 1];
+            if (p.x - (pr.x + pr.w) <= 4.5) seg.push(p); else { flush(); seg.push(p); } }
+        });
+        flush();
+      }
+      return out;
+    }
+    for (let si = 0; si < sheets.length; si++) {
+      if (toPlace.length === 0) break;
+      if (pureIdx.indexOf(si) !== -1) continue;
+      let bigArr = sheets[si].filter(p => !isSmall(p)).map(clone);
+      let cur = fillMax(bigArr);
+      for (let it = 0; it < 12; it++) {
+        let best = null;
+        for (const sg of rowSegments(bigArr)) {
+          const trial = bigArr.map(clone);
+          trial.forEach(p => { if (sg.keys[gkey(p)]) p.x += sg.d; });
+          let bad = false;
+          for (let i = 0; i < trial.length; i++) for (let j = i + 1; j < trial.length; j++) {
+            const a = trial[i], b = trial[j];
+            if (a.x < b.x + b.w - 0.01 && a.x + a.w > b.x + 0.01 &&
+                a.y < b.y + b.h - 0.01 && a.y + a.h > b.y + 0.01) bad = true;
+          }
+          if (bad) continue;
+          const r2 = fillMax(trial);
+          if (r2.length > cur.length && (!best || r2.length > best.r.length)) best = { t: trial, r: r2 };
+        }
+        if (!best) break;
+        bigArr = best.t; cur = best.r;
+      }
+      const existing = sheets[si].filter(isSmall).length;
+      const capacity = cur.length - existing;
+      if (capacity <= 0) continue;
+      const take = Math.min(capacity, toPlace.length);
+      const proto = toPlace[0];
+      const out = bigArr.map(clone);
+      for (let i = 0; i < existing + take; i++) {
+        const c = cur[i];
+        out.push({ partId: proto.partId, name: proto.name, x: c.x, y: c.y, w: c.w, h: c.h,
+          color: proto.color, instance: 0, originalW: proto.originalW, originalH: proto.originalH, rotated: false });
+      }
+      let bad = false;
+      for (const p of out) { if (p.x < -0.5 || p.y < -0.5 || p.x + p.w > sheetW + 0.5 || p.y + p.h > sheetH + 0.5) bad = true; }
+      for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
+        const a = out[i], b = out[j];
+        if (a.x < b.x + b.w - 0.01 && a.x + a.w > b.x + 0.01 &&
+            a.y < b.y + b.h - 0.01 && a.y + a.h > b.y + 0.01) bad = true;
+      }
+      if (bad) continue;
+      sheets[si] = out;
+      rebuildFree(si);
+      toPlace.splice(0, take);
+    }
+    // 全部填得下 → 从后往前删除纯小条板（同步 freeRects）
+    if (toPlace.length === 0) {
+      pureIdx.slice().sort((a, b) => b - a).forEach(i => {
+        sheets.splice(i, 1); freeRects.splice(i, 1);
+      });
     }
   })();
 
@@ -5159,6 +5394,24 @@ function runOptimization() {
   setTimeout(() => {
     let bestResult = null;
 
+    // 交付/收尾：统一处理超限警告、结果入库、渲染
+    function finishResult(bestResult) {
+      if (sheetCount > 0 && bestResult.stats.sheetCount > sheetCount) {
+        showToast(`警告：需要 ${bestResult.stats.sheetCount} 张板，超过指定的 ${sheetCount} 张`, 'error');
+      }
+      if (bestResult.stats.unplacedCount > 0) {
+        showToast(`${bestResult.stats.unplacedCount} 个零件未能放置（板材不足）`, 'error');
+      }
+      state.results = bestResult;
+      bestResult.layoutGroups = buildLayoutGroups(bestResult.sheets);
+      state.activeSheet = 0;
+      boardZoom.initialized = false;   // 重新优化后需要重新自适应窗口
+      renderResults();
+      // 移动端：计算完成后自动切换到「排版结果」视图
+      if (window.innerWidth <= 768) setMobileView('result');
+      showToast(`排版完成！使用 ${bestResult.stats.sheetCount} 张板，利用率 ${bestResult.stats.efficiency.toFixed(1)}%`, 'success');
+    }
+
     if (strategy === 'auto') {
       // 运行所有启发式 × 多种排序维度，多目标择优：
       // 1) 优先利用率：明显更高（相差 > 0.5%）的方案胜出；
@@ -5206,32 +5459,19 @@ function runOptimization() {
           bestEntry = e;
         }
       }
-      // 第二轮：只对最终胜出的方案跑一次末板小件集中（整排贴边+蓝框填条），
-      // 既贴合下料手势，又把昂贵的重排限制为一次，避免页面长时间无响应
-      window.__postConcentrate = true;
-      bestResult = packWithKerf(effParts, sheetW, sheetH, kerf, bestEntry.h, bestEntry.sm);
+      // 第二轮（尾板贴边+小条填充，含密集大池 DFS）放到新的 setTimeout，
+      // 先让出主线程：避免"第一轮 35 组合 + 第二轮大池 DFS"连续阻塞 ~8 秒触发"页面无响应"
+      showToast('正在优化尾板、填充小条...');
+      setTimeout(() => {
+        window.__postConcentrate = true;
+        const bestResult = packWithKerf(effParts, sheetW, sheetH, kerf, bestEntry.h, bestEntry.sm);
+        finishResult(bestResult);
+      }, 0);
     } else {
       window.__postConcentrate = true;
       bestResult = packWithKerf(effParts, sheetW, sheetH, kerf, strategy, 'area');
+      finishResult(bestResult);
     }
-
-    // 如果指定了板材数量且结果超过，给出警告
-    if (sheetCount > 0 && bestResult.stats.sheetCount > sheetCount) {
-      showToast(`警告：需要 ${bestResult.stats.sheetCount} 张板，超过指定的 ${sheetCount} 张`, 'error');
-    }
-
-    if (bestResult.stats.unplacedCount > 0) {
-      showToast(`${bestResult.stats.unplacedCount} 个零件未能放置（板材不足）`, 'error');
-    }
-
-    state.results = bestResult;
-    bestResult.layoutGroups = buildLayoutGroups(bestResult.sheets);
-    state.activeSheet = 0;
-    boardZoom.initialized = false;   // 重新优化后需要重新自适应窗口
-    renderResults();
-    // 移动端：计算完成后自动切换到「排版结果」视图
-    if (window.innerWidth <= 768) setMobileView('result');
-    showToast(`排版完成！使用 ${bestResult.stats.sheetCount} 张板，利用率 ${bestResult.stats.efficiency.toFixed(1)}%`, 'success');
   }, 50);
 }
 

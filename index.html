@@ -1340,54 +1340,6 @@ tr.lb-manual td { background: #fff7ec; }
   .li-main { font-size: 14px; }
   .lo-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
 }
-
-/* ========== 模式切换（零件排版 / 墙面算料） ========== */
-.mode-switch {
-  display: flex;
-  margin: 12px 12px 0;
-  background: var(--bg-primary);
-  border-radius: 6px;
-  padding: 3px;
-  gap: 2px;
-}
-.mode-btn {
-  flex: 1;
-  padding: 8px 4px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
-  border-radius: 4px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  transition: all 0.15s;
-}
-.mode-btn:hover { color: var(--text-primary); }
-.mode-btn.active {
-  background: var(--bg-card);
-  color: var(--accent);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  font-weight: 600;
-}
-.wall-calc-btn {
-  width: 100%;
-  justify-content: center;
-  margin-top: 10px;
-}
-.wall-result-box {
-  margin-top: 10px;
-  padding: 10px 12px;
-  background: var(--accent-bg);
-  border-radius: 6px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--text-primary);
-}
-.wall-result-box .big-num {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--accent);
-}
 </style>
 </head>
 <body>
@@ -1428,14 +1380,8 @@ tr.lb-manual td { background: #fff7ec; }
   <!-- 左侧输入面板 -->
   <aside class="sidebar">
 
-    <!-- 模式切换 -->
-    <div class="mode-switch">
-      <button class="mode-btn active" id="modePartBtn" onclick="switchMode('part')">零件排版</button>
-      <button class="mode-btn" id="modeWallBtn" onclick="switchMode('wall')">墙面算料</button>
-    </div>
-
     <!-- 原材料设置 -->
-    <div class="panel-section" id="rawMaterialPanel">
+    <div class="panel-section">
       <div class="panel-header">
         <span class="panel-title">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
@@ -1485,45 +1431,8 @@ tr.lb-manual td { background: #fff7ec; }
       </div>
     </div>
 
-    <!-- 墙面算料输入（墙面模式下显示） -->
-    <div class="panel-section" id="wallPanel" style="display:none;">
-      <div class="panel-header">
-        <span class="panel-title">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-          墙面参数
-        </span>
-      </div>
-      <div class="panel-body">
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">墙面长度 (mm)</label>
-            <input type="number" class="form-input" id="wallWidth" value="5000" min="100" step="10">
-          </div>
-          <div class="form-group">
-            <label class="form-label">墙面高度 (mm)</label>
-            <input type="number" class="form-input" id="wallHeight" value="3000" min="100" step="10">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group" style="flex:1;">
-            <label class="form-label">铺板方向</label>
-            <select class="form-input" id="wallDir">
-              <option value="auto">混排（自动取省板）</option>
-              <option value="h">横排（板长沿墙长）</option>
-              <option value="v">竖排（板长沿墙高）</option>
-            </select>
-          </div>
-        </div>
-        <button class="btn btn-primary wall-calc-btn" onclick="calcWall()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          计算需要几张板
-        </button>
-        <div class="wall-result-box" id="wallResultBox" style="display:none;"></div>
-      </div>
-    </div>
-
     <!-- 零件清单 -->
-    <div class="panel-section" id="partsPanel" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+    <div class="panel-section" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
       <div class="panel-header">
         <span class="panel-title">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
@@ -1578,7 +1487,7 @@ tr.lb-manual td { background: #fff7ec; }
     </div>
 
     <!-- 算法设置 -->
-    <div class="algorithm-settings" id="algoPanel">
+    <div class="algorithm-settings">
       <span>排版策略：</span>
       <select id="strategySelect">
         <option value="auto">自动择优（推荐）</option>
@@ -1588,7 +1497,7 @@ tr.lb-manual td { background: #fff7ec; }
         <option value="BAF">面积最适配 (BAF)</option>
         <option value="BL">左下角优先 (BL)</option>
       </select>
-      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.27</span>
+      <span style="margin-left:auto; font-size:11px; color:var(--text-muted);">v2.25</span>
     </div>
 
     <!-- 历史方案 -->
@@ -1739,7 +1648,6 @@ tr.lb-manual td { background: #fff7ec; }
       <button type="button" class="import-tab active" id="importTabPaste" onclick="switchImportTab('paste')">粘贴数据</button>
       <button type="button" class="import-tab" id="importTabFile" onclick="switchImportTab('file')">选择文件</button>
       <button type="button" class="import-tab" id="importTabImage" onclick="switchImportTab('image')">图片识别</button>
-      <button type="button" class="import-tab" id="importTabCAD" onclick="switchImportTab('cad')">CAD文件</button>
     </div>
 
     <div id="importPanePaste">
@@ -1784,17 +1692,6 @@ tr.lb-manual td { background: #fff7ec; }
       </div>
     </div>
 
-    <div id="importPaneCAD" style="display:none;">
-      <div class="import-hint">上传 CAD 排版图（.dxf 格式），自动识别图中每个闭合矩形作为一块板的尺寸。DWG 请先在 CAD 里另存为 DXF。</div>
-      <label class="import-file-btn" id="importCADLabel">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
-        点击选择 DXF 文件
-        <input type="file" id="importCADInput" accept=".dxf" style="display:none;" onchange="handleImportCAD(this)">
-      </label>
-      <div class="import-format-hint" id="importCADName">未选择文件</div>
-      <div id="cadStatus" class="import-format-hint" style="display:none;"></div>
-    </div>
-
     <div id="importPreview" class="import-preview" style="display:none;">
       <div class="import-preview-title">
         识别结果预览 <span id="importPreviewCount"></span>
@@ -1833,7 +1730,6 @@ tr.lb-manual td { background: #fff7ec; }
 </div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.min.js"></script>
 <script>
 
 /* ================================================================
@@ -1946,15 +1842,12 @@ function switchImportTab(tab) {
   const isPaste = tab === 'paste';
   const isFile = tab === 'file';
   const isImage = tab === 'image';
-  const isCAD = tab === 'cad';
   $('importTabPaste').classList.toggle('active', isPaste);
   $('importTabFile').classList.toggle('active', isFile);
   $('importTabImage').classList.toggle('active', isImage);
-  $('importTabCAD').classList.toggle('active', isCAD);
   $('importPanePaste').style.display = isPaste ? '' : 'none';
   $('importPaneFile').style.display = isFile ? '' : 'none';
   $('importPaneImage').style.display = isImage ? '' : 'none';
-  $('importPaneCAD').style.display = isCAD ? '' : 'none';
 }
 
 /**
@@ -2428,101 +2321,6 @@ function importFromText() {
   }
   closeImportModal();
   addImportedParts(rows);
-}
-
-/** 处理CAD DXF文件导入 */
-function handleImportCAD(input) {
-  const file = input.files && input.files[0];
-  if (!file) return;
-  $('importCADName').textContent = file.name + '（' + (file.size / 1024).toFixed(1) + ' KB）';
-  const statusEl = $('cadStatus');
-  statusEl.style.display = '';
-  statusEl.textContent = '正在解析DXF文件...';
-
-  if (typeof DxfParser === 'undefined') {
-    statusEl.textContent = '错误：DXF解析库未加载，请检查网络';
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const parser = new DxfParser();
-      const dxf = parser.parseSync(e.target.result);
-      const entities = dxf.entities || [];
-
-      // 提取所有闭合多段线（LWPOLYLINE / POLYLINE）作为矩形零件
-      const rects = [];
-      for (const ent of entities) {
-        if (ent.type === 'LWPOLYLINE' && ent.closed) {
-          const pts = ent.vertices || ent.vertices;
-          if (!pts || pts.length < 3) continue;
-          // 计算边界
-          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-          for (const p of pts) {
-            const x = p.x !== undefined ? p.x : p[0];
-            const y = p.y !== undefined ? p.y : p[1];
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-          }
-          const w = Math.abs(maxX - minX);
-          const h = Math.abs(maxY - minY);
-          // 过滤掉太小的（<50mm的可能是标注/辅助线）
-          if (w >= 50 && h >= 50) {
-            rects.push({ width: Math.round(w), height: Math.round(h) });
-          }
-        } else if (ent.type === 'POLYLINE' && ent.closed) {
-          const pts = ent.vertices || [];
-          if (!pts.length) continue;
-          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-          for (const p of pts) {
-            const x = p.x, y = p.y;
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-          }
-          const w = Math.abs(maxX - minX);
-          const h = Math.abs(maxY - minY);
-          if (w >= 50 && h >= 50) {
-            rects.push({ width: Math.round(w), height: Math.round(h) });
-          }
-        }
-      }
-
-      if (rects.length === 0) {
-        statusEl.textContent = '未识别到闭合矩形，请确认DXF中包含闭合多段线（LWPOLYLINE）';
-        return;
-      }
-
-      // 合并相同尺寸的矩形，统计数量
-      const map = {};
-      for (const r of rects) {
-        // 尺寸相近的合并（±2mm内视为同尺寸）
-        const key = r.width + 'x' + r.height;
-        if (!map[key]) map[key] = { width: r.width, height: r.height, qty: 0 };
-        map[key].qty++;
-      }
-      const partsList = Object.values(map);
-
-      statusEl.textContent = '识别到 ' + rects.length + ' 个矩形，合并为 ' + partsList.length + ' 种尺寸';
-
-      // 用现有的预览表格显示结果
-      renderPreviewTable(partsList.map((p, i) => ({
-        name: '板' + (i + 1),
-        width: p.width,
-        height: p.height,
-        qty: p.qty
-      })), 'CAD识别结果：' + rects.length + ' 个矩形，' + partsList.length + ' 种尺寸。可修改后点「导入」');
-
-    } catch (err) {
-      console.error(err);
-      statusEl.textContent = '解析失败：' + err.message;
-    }
-  };
-  reader.readAsText(file);
 }
 
 /** 处理选择的文件（CSV/TSV/TXT 直接读；XLSX/XLS 动态加载 SheetJS 解析） */
@@ -6697,176 +6495,6 @@ function clearAll() {
       </div>`;
     showToast('数据已清空', 'success');
   }, '清空数据');
-}
-
-// ========== 墙面算料模式 ==========
-function switchMode(mode) {
-  const isWall = mode === 'wall';
-  $('modePartBtn').classList.toggle('active', !isWall);
-  $('modeWallBtn').classList.toggle('active', isWall);
-  $('wallPanel').style.display = isWall ? '' : 'none';
-  $('partsPanel').style.display = isWall ? 'none' : '';
-  $('algoPanel').style.display = isWall ? 'none' : '';
-}
-
-// 根据墙面尺寸生成铺板零件清单
-// dir: 'h' = 横排（板长沿墙长）, 'v' = 竖排（板长沿墙高）
-// 返回零件数组 [{name, width, height, qty}]，rotatable统一false（墙面铺板方向固定）
-function buildWallParts(wallW, wallH, sheetW, sheetH, dir) {
-  // 确定每格铺板单元的尺寸方向
-  // 横排：板长sheetW水平沿墙长，板宽sheetH垂直沿墙高
-  // 竖排：板宽sheetH水平沿墙长，板长sheetW垂直沿墙高
-  const cellW = dir === 'h' ? sheetW : sheetH;  // 每格水平方向占的宽度
-  const cellH = dir === 'h' ? sheetH : sheetW;  // 每格垂直方向占的高度
-
-  const N = Math.ceil(wallW / cellW);  // 列数
-  const M = Math.ceil(wallH / cellH);  // 行数
-
-  const lastCellW = wallW - (N - 1) * cellW;  // 最后一列的实际宽度
-  const lastCellH = wallH - (M - 1) * cellH;  // 最后一行的实际高度
-
-  const parts = [];
-  let seq = 1;
-
-  // 完整块（前N-1列 × 前M-1行）——每个都是标准整板尺寸
-  const fullCount = (N - 1) * (M - 1);
-  if (fullCount > 0) {
-    parts.push({
-      name: '整板',
-      width: cellW,
-      height: cellH,
-      qty: fullCount
-    });
-  }
-
-  // 最后一列（窄条）：1列 × M行
-  if (N > 1) {
-    // 前 M-1 行：窄条 × 标准高
-    if (M - 1 > 0) {
-      parts.push({
-        name: '侧边条',
-        width: lastCellW,
-        height: cellH,
-        qty: M - 1
-      });
-    }
-    // 最后一行最后一列：小角块
-    if (M > 1) {
-      parts.push({
-        name: '边角块',
-        width: lastCellW,
-        height: lastCellH,
-        qty: 1
-      });
-    } else {
-      // 只有一列时，最后一列就是全部
-      parts.push({
-        name: '整板',
-        width: lastCellW,
-        height: cellH,
-        qty: 1
-      });
-    }
-  }
-
-  // 最后一行（矮条）：前N-1列 × 1行
-  if (M > 1 && N > 1) {
-    parts.push({
-      name: '底边条',
-      width: cellW,
-      height: lastCellH,
-      qty: N - 1
-    });
-  } else if (M > 1 && N === 1) {
-    // 只有一列多行
-    parts.push({
-      name: '整板',
-      width: cellW,
-      height: lastCellH,
-      qty: 1
-    });
-  }
-
-  // 如果只有1列1行，直接生成一个零件
-  if (N === 1 && M === 1) {
-    parts.length = 0;
-    parts.push({
-      name: '单块',
-      width: wallW,
-      height: wallH,
-      qty: 1
-    });
-  }
-
-  return parts;
-}
-
-function calcWall() {
-  const wallW = parseFloat($('wallWidth').value);
-  const wallH = parseFloat($('wallHeight').value);
-  const sheetW = parseFloat($('sheetWidth').value);
-  const sheetH = parseFloat($('sheetHeight').value);
-  const dir = $('wallDir').value;
-
-  if (!wallW || wallW <= 0) { showToast('请输入有效的墙面长度', 'error'); return; }
-  if (!wallH || wallH <= 0) { showToast('请输入有效的墙面高度', 'error'); return; }
-
-  // 估算两种方向的"网格铺板数"（完整块数 + 窄条/矮条占位），用于混排选优
-  function estimateSheets(cellW, cellH) {
-    const N = Math.ceil(wallW / cellW);
-    const M = Math.ceil(wallH / cellH);
-    // 粗略估算：完整块 = (N-1)*(M-1) 张板；窄条和矮条各约占半张板
-    const full = (N - 1) * (M - 1);
-    const strips = (N > 1 ? 1 : 0) + (M > 1 ? 1 : 0);
-    return full + strips;
-  }
-
-  // 确定方向
-  let chosenDir, chosenLabel;
-  if (dir === 'h') {
-    chosenDir = 'h'; chosenLabel = '横排';
-  } else if (dir === 'v') {
-    chosenDir = 'v'; chosenLabel = '竖排';
-  } else {
-    // 混排：估算两种方向，取省板的
-    const estH = estimateSheets(sheetW, sheetH);
-    const estV = estimateSheets(sheetH, sheetW);
-    if (estH <= estV) { chosenDir = 'h'; chosenLabel = '横排（较省板）'; }
-    else { chosenDir = 'v'; chosenLabel = '竖排（较省板）'; }
-  }
-
-  const partsList = buildWallParts(wallW, wallH, sheetW, sheetH, chosenDir);
-
-  // 清空当前零件，填入墙面零件
-  state.parts = [];
-  state.nextPartId = 1;
-  for (const p of partsList) {
-    state.parts.push({
-      id: state.nextPartId++,
-      name: p.name,
-      width: p.width,
-      height: p.height,
-      qty: p.qty,
-      rotatable: false,
-      autoNamed: true,
-      color: generatePartColor(state.parts.length)
-    });
-  }
-
-  // 显示结果摘要
-  const box = $('wallResultBox');
-  box.style.display = '';
-  const totalParts = partsList.reduce((s, p) => s + p.qty, 0);
-  const fullBlocks = partsList.find(p => p.name === '整板');
-  box.innerHTML = `
-    <div>方向：<b>${chosenLabel}</b></div>
-    <div>墙面：${wallW} × ${wallH} mm</div>
-    <div>铺板单元：${totalParts} 块（含 ${fullBlocks ? fullBlocks.qty : 0} 块整板）</div>
-    <div style="margin-top:6px;color:var(--text-muted);font-size:12px;">右侧排版图显示精确用板数</div>
-  `;
-
-  // 直接调用排版优化
-  runOptimization();
 }
 
 // ========== 事件绑定 ==========
